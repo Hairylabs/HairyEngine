@@ -283,11 +283,18 @@ hierarchy.render();
 status.setSelection(null);
 status.setStatus('ready');
 
-// Gizmo mode toolbar
-const toolbarBtns = document.querySelectorAll<HTMLButtonElement>('#viewport-toolbar .gizmo-btn');
+// Gizmo mode toolbar — only the buttons that actually carry a data-mode
+// attribute. Without this filter, the ⊞ / ✂ / ⤓ / ∷ / ❀ / ⚡ buttons would
+// also match (they share .gizmo-btn for styling), call setGizmoMode(undefined),
+// and corrupt the TransformControls helper into a crash next frame
+// ("Cannot read properties of undefined (reading 'children')").
+const toolbarBtns = document.querySelectorAll<HTMLButtonElement>(
+  '#viewport-toolbar .gizmo-btn[data-mode]',
+);
 toolbarBtns.forEach((btn) => {
   btn.addEventListener('click', () => {
     const mode = btn.dataset.mode as 'translate' | 'rotate' | 'scale';
+    if (mode !== 'translate' && mode !== 'rotate' && mode !== 'scale') return;
     viewport.setGizmoMode(mode);
   });
 });

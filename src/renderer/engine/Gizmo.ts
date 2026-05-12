@@ -54,6 +54,10 @@ export class Gizmo {
   }
 
   setMode(mode: GizmoMode) {
+    // Defensive: any value other than translate/rotate/scale corrupts
+    // TransformControlsHelper.mode and crashes next frame in
+    // updateMatrixWorld. Bail rather than poison the helper.
+    if (mode !== 'translate' && mode !== 'rotate' && mode !== 'scale') return;
     this.controls.setMode(mode);
     this.modeListeners.forEach((l) => l(mode));
   }

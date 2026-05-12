@@ -1,6 +1,6 @@
 {
   "name": "hairyengine",
-  "version": "0.0.12",
+  "version": "0.0.13",
   "private": true,
   "description": "HairyEngine — desktop Three.js scene editor with Claude + Blender MCP integration",
   "author": "Hairylabs",

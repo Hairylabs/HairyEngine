@@ -86,6 +86,17 @@ function pushSynthetic(level: LogLevel, message: string) {
   buffer.push(entry);
   if (buffer.length > MAX_ENTRIES) buffer.shift();
   listeners.forEach((l) => l(entry));
+  // Forward to the main-process rolling log file so uncaught errors land
+  // in main.log alongside normal console output. Without this, the file
+  // never sees the crash that actually matters.
+  const w = window as unknown as {
+    hairy?: { log?: { write?: (lvl: string, msg: string) => void } };
+  };
+  try {
+    w.hairy?.log?.write?.(level, message);
+  } catch {
+    // never let logging crash the app
+  }
 }
 
 function formatArg(a: unknown): string {
