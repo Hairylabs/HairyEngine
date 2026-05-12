@@ -23,20 +23,33 @@
         <button id="wallet-btn" class="wallet-btn" title="Connect MetaMask / browser wallet (PulseChain)">🦊 Connect Wallet</button>
       </header>
       <div class="app-body">
-        <aside class="panel-left" id="panel-hierarchy">
-          <div class="panel-header"><span>Scene</span></div>
-          <div class="panel-content" id="hierarchy-tree"></div>
+        <aside class="panel-left split-vertical" id="panel-hierarchy">
+          <div class="panel-section panel-section-top">
+            <div class="panel-header"><span>Scene · Levels</span></div>
+            <div class="levels-bar" id="levels-bar">
+              <div id="levels-chips"></div>
+              <div class="levels-actions">
+                <button class="level-chip-action" id="levels-rename" title="Rename current level">✎</button>
+                <button class="level-chip-action" id="levels-duplicate" title="Duplicate current level">⧉</button>
+                <button class="level-chip-action" id="levels-delete" title="Delete current level">🗑</button>
+                <button class="level-chip-action" id="levels-help" title="What are Levels?">?</button>
+              </div>
+            </div>
+            <div class="panel-content" id="hierarchy-tree"></div>
+          </div>
+          <div class="panel-divider" id="left-panel-divider"></div>
+          <div class="panel-section panel-section-bottom">
+            <div class="panel-header" id="assets-header">
+              <span>Assets</span>
+              <button class="panel-header-action" id="assets-refresh" title="Refresh">⟳</button>
+              <button class="panel-header-action" id="assets-add" title="New (import GLB / create script / new folder)">+</button>
+            </div>
+            <div class="panel-content" id="assets-body"></div>
+          </div>
         </aside>
         <section class="center">
-          <div class="levels-bar" id="levels-bar">
-            <span class="levels-bar-label">Levels</span>
-            <div id="levels-chips" style="display: flex; gap: 4px; flex: 1; flex-wrap: wrap;"></div>
-            <button class="level-chip-action" id="levels-rename" title="Rename current level">✎</button>
-            <button class="level-chip-action" id="levels-duplicate" title="Duplicate current level">⧉</button>
-            <button class="level-chip-action" id="levels-delete" title="Delete current level">🗑</button>
-            <button class="level-chip-action" id="levels-help" title="What are Levels?">?</button>
-          </div>
-          <main class="viewport">
+          <main class="viewport" id="viewport-host">
+            <div class="viewport-pane main" id="viewport-main">
             <canvas id="canvas-3d"></canvas>
             <div class="viewport-toolbar" id="viewport-toolbar">
               <button data-mode="translate" class="gizmo-btn active" title="Translate (W)">⇄</button>
@@ -89,19 +102,19 @@
             <div class="viewport-overlay" id="viewport-overlay">
               <div class="hint">RMB drag = look · WASD fly · F focus · W/E/R gizmo · Ctrl+Z undo</div>
             </div>
+            </div><!-- /viewport-pane.main -->
+            <div class="viewport-pane topdown" id="viewport-topdown" hidden></div>
           </main>
           <div class="bottom-panel" id="bottom-panel">
             <div class="panel-tabs bottom-tabs">
               <button class="panel-tab active" data-bottom-tab="console">Console</button>
-              <button class="panel-tab" data-bottom-tab="assets">Assets</button>
+              <button class="panel-tab" data-bottom-tab="perf">Perf</button>
               <div class="bottom-tab-spacer"></div>
               <button class="bottom-tab-action" id="console-clear" title="Clear console">Clear</button>
               <button class="bottom-tab-collapse" id="bottom-collapse" title="Collapse">⌄</button>
             </div>
             <div class="bottom-content" id="console-body"></div>
-            <div class="bottom-content" id="assets-body" hidden>
-              <div class="empty">Asset library coming next.</div>
-            </div>
+            <div class="bottom-content" id="perf-body" hidden></div>
           </div>
         </section>
         <aside class="panel-right" id="panel-inspector">

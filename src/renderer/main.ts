@@ -12,6 +12,9 @@ import './engine/scripts'; // side-effect: register built-in scripts
 import { installLogBus } from './engine/LogBus';
 import { ConsolePanel } from './ui/ConsolePanel';
 import { AssetPanel } from './ui/AssetPanel';
+import { PerfPanel } from './ui/PerfPanel';
+import { perf } from './engine/PerfMonitor';
+import { bootUserScripts } from './engine/UserScripts';
 import { ClaudePanel } from './ui/ClaudePanel';
 
 // Install the log bus before any other module so we capture even the earliest logs.
@@ -289,25 +292,29 @@ faceExtrude.onChange((on) => {
   }
 });
 
-// Wireframe / mesh mode — overlay clean edge lines on every mesh. We use
-// THREE.EdgesGeometry (angle-threshold filter) so a quad's diagonal triangle
-// split doesn't clutter the view. Each overlay is a child LineSegments
-// tagged with userData.isWireframeOverlay so we can find + remove them all.
-let wireframeOn = false;
+// Wireframe / mesh mode — Blender-style cycling shading modes:
+//   0  SOLID       — normal materials, no wires
+//   1  SOLID+WIRE  — full color + cyan wire overlay (on top)
+//   2  XRAY+WIRE   — half-opacity materials + wire overlay (Blender's X-Ray)
+//   3  WIRE-ONLY   — material.wireframe=true on every mesh, no solid fill
+// Click cycles forward; Shift-click resets to SOLID.
 const WIREFRAME_TAG = '__wireframeOverlay';
+const ORIG_MAT_KEY = '__origMaterial';
+const ORIG_OPACITY_KEY = '__origOpacity';
+type WireMode = 0 | 1 | 2 | 3;
+const WIRE_LABELS: Record<WireMode, string> = {
+  0: 'Solid',
+  1: 'Solid + wires',
+  2: 'X-Ray + wires',
+  3: 'Wire-only',
+};
+let wireMode: WireMode = 0;
 const wireframeBtn = document.getElementById('wireframe-btn') as HTMLButtonElement;
 
 function addWireframeOverlay(mesh: THREE.Mesh) {
-  // Skip if already wrapped or this isn't a mesh that has BufferGeometry.
   if (mesh.children.some((c) => c.userData[WIREFRAME_TAG])) return;
   if (!mesh.geometry) return;
-  // Use a low angle threshold (1°) so coplanar quad diagonals stay hidden
-  // but anything that's actually a real edge shows up — including imported
-  // GLBs which sometimes have slight float drift between adjacent triangles.
   const edges = new THREE.EdgesGeometry(mesh.geometry, 1);
-  // Bright cyan, on top of everything, no depth test → wires always visible
-  // regardless of camera angle or distance. Linewidth >1 doesn't work on
-  // WebGL but the contrast color is enough on the dark UI palette.
   const lines = new THREE.LineSegments(
     edges,
     new THREE.LineBasicMaterial({
@@ -338,44 +345,86 @@ function removeWireframeOverlays(obj: THREE.Object3D) {
   });
 }
 
-function applyWireframe(on: boolean) {
-  if (!on) {
-    removeWireframeOverlays(scene.editable);
-    return;
+/** Snapshot original material settings so we can restore them when leaving
+ *  X-Ray / wire-only modes. We store only what we mutate (opacity, wireframe,
+ *  transparent) on the material itself via userData. */
+function ensureMatSnapshot(mat: THREE.Material) {
+  const m = mat as THREE.Material & { opacity?: number; wireframe?: boolean; transparent?: boolean };
+  if (m.userData[ORIG_OPACITY_KEY] === undefined) {
+    m.userData[ORIG_OPACITY_KEY] = {
+      opacity: m.opacity ?? 1,
+      transparent: !!m.transparent,
+      wireframe: !!m.wireframe,
+    };
   }
+}
+function restoreMaterial(mat: THREE.Material) {
+  const m = mat as THREE.Material & { opacity?: number; wireframe?: boolean; transparent?: boolean };
+  const snap = m.userData[ORIG_OPACITY_KEY] as
+    | { opacity: number; transparent: boolean; wireframe: boolean }
+    | undefined;
+  if (!snap) return;
+  if (m.opacity !== undefined) m.opacity = snap.opacity;
+  m.transparent = snap.transparent;
+  if ('wireframe' in m) m.wireframe = snap.wireframe;
+  m.needsUpdate = true;
+}
+
+function applyWireMode(mode: WireMode) {
+  // Always clear overlays + restore originals first.
+  removeWireframeOverlays(scene.editable);
   scene.editable.traverse((o) => {
     const m = o as THREE.Mesh;
-    if (m.isMesh) addWireframeOverlay(m);
+    if (!m.isMesh) return;
+    const mats = Array.isArray(m.material) ? m.material : [m.material];
+    for (const mat of mats) {
+      if (mat) restoreMaterial(mat);
+    }
+  });
+
+  if (mode === 0) return; // solid
+
+  scene.editable.traverse((o) => {
+    const m = o as THREE.Mesh;
+    if (!m.isMesh) return;
+    const mats = Array.isArray(m.material) ? m.material : [m.material];
+    for (const mat of mats) {
+      if (!mat) continue;
+      ensureMatSnapshot(mat);
+      const x = mat as THREE.Material & { opacity?: number; wireframe?: boolean; transparent?: boolean };
+      if (mode === 1) {
+        // Solid + wires: leave material alone, just overlay edges
+      } else if (mode === 2) {
+        // X-Ray: half opacity
+        x.transparent = true;
+        if (x.opacity !== undefined) x.opacity = 0.4;
+        x.needsUpdate = true;
+      } else if (mode === 3) {
+        // Wire-only: render mesh as lines via material.wireframe
+        if ('wireframe' in x) x.wireframe = true;
+        x.needsUpdate = true;
+      }
+    }
+    // Overlay wires for modes 1 and 2 (mode 3 already uses material.wireframe).
+    if (mode === 1 || mode === 2) addWireframeOverlay(m);
   });
 }
 
-wireframeBtn.addEventListener('click', () => {
+wireframeBtn.addEventListener('click', (e) => {
   showGuide('wireframe');
-  wireframeOn = !wireframeOn;
-  wireframeBtn.classList.toggle('active', wireframeOn);
-  // Always clear first, then re-add if turning on. Defeats any stale overlay
-  // state (e.g. extruded mesh kept the old box's edges).
-  removeWireframeOverlays(scene.editable);
-  applyWireframe(wireframeOn);
-  const count = wireframeOn
-    ? scene.editable.children.reduce((n, c) => {
-        let k = 0;
-        c.traverse((o) => {
-          if ((o as THREE.Mesh).isMesh) k++;
-        });
-        return n + k;
-      }, 0)
-    : 0;
-  status.setStatus(
-    wireframeOn ? `Wireframe ON (${count} meshes outlined)` : 'Wireframe OFF',
-  );
+  if (e.shiftKey) {
+    wireMode = 0;
+  } else {
+    wireMode = ((wireMode + 1) % 4) as WireMode;
+  }
+  wireframeBtn.classList.toggle('active', wireMode !== 0);
+  applyWireMode(wireMode);
+  status.setStatus(`Wireframe mode: ${WIRE_LABELS[wireMode]}${wireMode === 0 ? '' : ' — click to cycle, Shift+click resets'}`);
 });
-// Re-apply when scene changes so newly-added meshes inherit the state and
-// re-extruded meshes get fresh overlays at the new geometry.
+
 scene.onSceneChanged(() => {
-  if (!wireframeOn) return;
-  removeWireframeOverlays(scene.editable);
-  applyWireframe(true);
+  if (wireMode === 0) return;
+  applyWireMode(wireMode);
 });
 // F key toggles face mode for power users.
 window.addEventListener('keydown', (e) => {
@@ -477,23 +526,43 @@ function showAboutDialog() {
   });
 }
 
-// Console panel + bottom-tab switching + collapse toggle
+// Console panel (bottom) + Asset panel (now in left sidebar)
 const consoleEl = document.getElementById('console-body') as HTMLElement;
 const assetsEl = document.getElementById('assets-body') as HTMLElement;
+const perfEl = document.getElementById('perf-body') as HTMLElement;
 const consolePanel = new ConsolePanel(consoleEl);
 const assetPanel = new AssetPanel(assetsEl, scene, history, (msg) => status.setStatus(msg));
+const perfPanel = new PerfPanel(perfEl, scene);
+void perfPanel;
 void consolePanel;
 void assetPanel;
+// Load user-defined scripts so they show up in +Add Component
+bootUserScripts();
+// Install perf hooks so global errors increment the counter.
+perf.install();
+// Wire the +/refresh buttons in the asset panel header to AssetPanel methods.
+document.getElementById('assets-refresh')?.addEventListener('click', () => assetPanel.refresh());
+document.getElementById('assets-add')?.addEventListener('click', (e) => {
+  const rect = (e.currentTarget as HTMLElement).getBoundingClientRect();
+  // Synthesize a contextmenu on the asset list at this location.
+  const ev = new MouseEvent('contextmenu', {
+    bubbles: true,
+    clientX: rect.left,
+    clientY: rect.bottom + 4,
+  });
+  assetsEl.dispatchEvent(ev);
+});
+
 document.getElementById('console-clear')?.addEventListener('click', () => {
   consolePanel.clear();
 });
 const bottomTabs = document.querySelectorAll<HTMLButtonElement>('.bottom-tabs .panel-tab');
 bottomTabs.forEach((btn) => {
   btn.addEventListener('click', () => {
-    const tab = btn.dataset.bottomTab as 'console' | 'assets';
+    const tab = btn.dataset.bottomTab as 'console' | 'perf';
     bottomTabs.forEach((b) => b.classList.toggle('active', b === btn));
     consoleEl.hidden = tab !== 'console';
-    assetsEl.hidden = tab !== 'assets';
+    perfEl.hidden = tab !== 'perf';
   });
 });
 const centerEl = document.querySelector('.center') as HTMLElement;
@@ -898,7 +967,10 @@ document.getElementById('scatter-btn')?.addEventListener('click', () => {
 
 // --- Sprint 5 v3: Top-down split viewport ---------------------------------
 const topdownBtn = document.getElementById('topdown-btn') as HTMLButtonElement;
-const topdown = new TopDownView(viewportEl, scene, (obj) => {
+// TopDownView mounts itself inside #viewport-topdown (a sibling of the main
+// pane). It needs the parent .viewport for the .has-topdown class toggle.
+const viewportHost = document.getElementById('viewport-host') as HTMLElement;
+const topdown = new TopDownView(viewportHost, scene, (obj) => {
   scene.select(obj);
 });
 topdownBtn.addEventListener('click', () => {
@@ -1113,6 +1185,7 @@ viewport.start((dt, fps) => {
   inspector.tick();
   multiplayer.tick(dt);
   topdown.tick();
+  perf.recordFrame(dt);
 });
 
 // Hotkeys not handled inside Gizmo/EditorCamera

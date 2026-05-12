@@ -1369,19 +1369,8 @@ button:hover { background: #25253a; }
   border-color: var(--accent);
 }
 
-/* Top-down split viewport pane — appears on the right half of .viewport when active */
-.topdown-pane {
-  position: absolute;
-  right: 0;
-  top: 0;
-  bottom: 0;
-  width: 40%;
-  border-left: 2px solid var(--border);
-  background: #12161d;
-  z-index: 5;
-  display: flex;
-  flex-direction: column;
-}
+/* Top-down split — the pane itself is positioned by the parent .viewport
+   grid (.has-topdown -> 2 columns), so we just style the canvas + label. */
 .topdown-canvas {
   width: 100%;
   height: 100%;
@@ -1400,10 +1389,6 @@ button:hover { background: #25253a; }
   border: 1px solid var(--border);
   border-radius: 4px;
   pointer-events: none;
-}
-.viewport.has-topdown .viewport-toolbar {
-  left: 8px;
-  right: auto;
 }
 
 /* Modeling tools popup menu */
@@ -1732,4 +1717,281 @@ button:hover { background: #25253a; }
 }
 .tree-context-menu button.danger:hover {
   background: rgba(255, 80, 80, 0.15);
+}
+
+/* Left panel split (Scene top / Assets bottom) — replaces the old bottom Assets tab */
+.panel-left.split-vertical {
+  display: grid;
+  grid-template-rows: 1fr 4px 1fr;
+  min-height: 0;
+}
+.panel-section {
+  display: flex;
+  flex-direction: column;
+  min-height: 0;
+  overflow: hidden;
+}
+.panel-section .panel-content { flex: 1 1 0; min-height: 0; }
+.panel-divider {
+  background: var(--border);
+  cursor: row-resize;
+  height: 4px;
+}
+.panel-divider:hover { background: var(--accent-2); }
+.panel-header {
+  display: flex;
+  align-items: center;
+}
+.panel-header > span { flex: 1; }
+.panel-header-action {
+  background: transparent;
+  border: 1px solid transparent;
+  color: var(--muted);
+  width: 22px;
+  height: 22px;
+  border-radius: 4px;
+  padding: 0;
+  font-size: 14px;
+  margin-left: 2px;
+  cursor: pointer;
+  line-height: 1;
+}
+.panel-header-action:hover { background: rgba(255,255,255,0.06); color: var(--accent-2); }
+
+/* Compact asset rows inside the left panel */
+.asset-row {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  padding: 4px 8px;
+  font-size: 11px;
+  border-bottom: 1px solid rgba(255,255,255,0.04);
+  cursor: pointer;
+  user-select: none;
+}
+.asset-row:hover { background: rgba(76, 248, 197, 0.08); }
+.asset-row.selected { background: rgba(76, 248, 197, 0.15); }
+.asset-row .ext-badge {
+  font-size: 9px;
+  font-family: ui-monospace, monospace;
+  padding: 1px 4px;
+  border-radius: 3px;
+  background: rgba(255,255,255,0.08);
+  color: var(--muted);
+  flex-shrink: 0;
+  width: 26px;
+  text-align: center;
+}
+.asset-row .ext-badge.is-glb,
+.asset-row .ext-badge.is-gltf { color: var(--accent-2); background: rgba(76, 248, 197, 0.12); }
+.asset-row .ext-badge.is-js,
+.asset-row .ext-badge.is-ts { color: #ffd166; background: rgba(255, 209, 102, 0.12); }
+.asset-row .asset-name {
+  flex: 1;
+  white-space: nowrap;
+  overflow: hidden;
+  text-overflow: ellipsis;
+}
+.asset-row .asset-size {
+  color: var(--muted);
+  font-family: ui-monospace, monospace;
+  font-size: 10px;
+}
+.asset-toolbar {
+  padding: 6px 8px;
+  border-bottom: 1px solid var(--border);
+  display: flex;
+  gap: 4px;
+  flex-wrap: wrap;
+  background: rgba(0,0,0,0.15);
+}
+.asset-toolbar button {
+  font-size: 10px;
+  padding: 3px 8px;
+}
+
+/* Script editor modal — bigger than the about modal */
+.script-editor-backdrop {
+  position: fixed;
+  inset: 0;
+  background: rgba(0,0,0,0.7);
+  z-index: 8000;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+}
+.script-editor {
+  width: 80vw;
+  max-width: 980px;
+  height: 80vh;
+  max-height: 720px;
+  background: #14141d;
+  border: 1px solid var(--border);
+  border-radius: 8px;
+  display: flex;
+  flex-direction: column;
+  overflow: hidden;
+}
+.script-editor-head {
+  padding: 10px 14px;
+  border-bottom: 1px solid var(--border);
+  display: flex;
+  align-items: center;
+  gap: 12px;
+  background: rgba(255,255,255,0.03);
+}
+.script-editor-head input {
+  flex: 1;
+  background: rgba(0,0,0,0.4);
+  border: 1px solid var(--border);
+  color: var(--text);
+  padding: 5px 10px;
+  border-radius: 4px;
+  font-family: inherit;
+  font-size: 12px;
+}
+.script-editor textarea {
+  flex: 1;
+  background: #0a0a14;
+  color: #d4d4dc;
+  border: 0;
+  padding: 14px 18px;
+  font-family: ui-monospace, 'JetBrains Mono', 'Cascadia Code', monospace;
+  font-size: 12px;
+  line-height: 1.55;
+  resize: none;
+  outline: none;
+  white-space: pre;
+  overflow: auto;
+  tab-size: 2;
+}
+.script-editor-foot {
+  display: flex;
+  gap: 8px;
+  padding: 10px 14px;
+  border-top: 1px solid var(--border);
+  background: rgba(0,0,0,0.2);
+}
+.script-editor-foot .spacer { flex: 1; }
+.script-editor-foot .test-output {
+  font-family: ui-monospace, monospace;
+  font-size: 10px;
+  color: var(--muted);
+  padding: 4px 8px;
+  background: rgba(0,0,0,0.3);
+  border-radius: 4px;
+  max-width: 50%;
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+
+/* Performance tab */
+.perf-row {
+  display: grid;
+  grid-template-columns: 140px 1fr 80px;
+  gap: 8px;
+  padding: 4px 12px;
+  font-size: 11px;
+  font-family: ui-monospace, monospace;
+  border-bottom: 1px solid rgba(255,255,255,0.03);
+}
+.perf-row.header { font-weight: 700; color: var(--muted); }
+.perf-bar {
+  position: relative;
+  height: 14px;
+  background: rgba(255,255,255,0.06);
+  border-radius: 3px;
+  overflow: hidden;
+}
+.perf-bar-fill {
+  height: 100%;
+  background: var(--accent-2);
+  transition: width 0.2s;
+}
+.perf-bar-fill.warn { background: #ffd166; }
+.perf-bar-fill.error { background: #ff7878; }
+.perf-counter {
+  font-size: 18px;
+  font-weight: 700;
+  font-family: ui-monospace, monospace;
+  padding: 6px 12px;
+  border-right: 1px solid var(--border);
+}
+.perf-counter-label { font-size: 10px; color: var(--muted); font-weight: 400; display: block; }
+.perf-header {
+  display: flex;
+  border-bottom: 1px solid var(--border);
+  background: rgba(0,0,0,0.2);
+  padding: 6px 0;
+}
+
+/* Levels bar — when housed inside the Scene panel header area */
+.panel-section-top .levels-bar {
+  display: flex;
+  align-items: center;
+  flex-wrap: wrap;
+  gap: 4px;
+  padding: 6px 8px;
+  background: linear-gradient(180deg, rgba(76, 248, 197, 0.06), transparent);
+  border-bottom: 1px solid var(--border);
+  flex-shrink: 0;
+}
+.panel-section-top .levels-bar #levels-chips {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 3px;
+  flex: 1;
+  min-width: 0;
+}
+.panel-section-top .levels-bar .levels-actions {
+  display: flex;
+  gap: 2px;
+  margin-left: 4px;
+}
+.panel-section-top .levels-bar .level-chip {
+  font-size: 10px;
+  padding: 2px 8px;
+}
+.panel-section-top .levels-bar .level-chip-add {
+  font-size: 10px;
+  padding: 2px 6px;
+}
+.panel-section-top .levels-bar .level-chip-action {
+  font-size: 11px;
+  padding: 2px 4px;
+}
+
+/* Real top-down split — flex/grid based, not absolute overlay.
+   When .has-topdown is set on .viewport, it splits into 2 columns. */
+.viewport {
+  display: grid;
+  grid-template-columns: 1fr;
+  grid-template-rows: 1fr;
+}
+.viewport.has-topdown {
+  grid-template-columns: 1fr 1fr;
+}
+.viewport-pane {
+  position: relative;
+  min-width: 0;
+  min-height: 0;
+  overflow: hidden;
+}
+.viewport-pane canvas {
+  width: 100% !important;
+  height: 100% !important;
+  display: block;
+}
+.viewport-pane.topdown {
+  border-left: 2px solid var(--border);
+  background: #0c0c14;
+}
+
+/* Old absolute-overlay rules — explicitly cancelled so they don't stick */
+.topdown-pane {
+  position: static;
+  width: 100%;
+  height: 100%;
+  border-left: 0;
 }

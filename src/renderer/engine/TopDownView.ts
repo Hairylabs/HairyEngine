@@ -28,18 +28,21 @@ export class TopDownView {
     private scene: Scene,
     private syncSelect: SyncSelect,
   ) {
-    // Build a side container so toggling display: none cleanly hides it.
-    this.container = document.createElement('div');
-    this.container.className = 'topdown-pane';
+    // The topdown pane is now a sibling of the main viewport pane, sized by
+    // the parent's CSS grid (.viewport.has-topdown). We just mount our
+    // canvas + label inside the existing #viewport-topdown div.
+    const paneSlot = document.getElementById('viewport-topdown');
+    if (!paneSlot) throw new Error('TopDownView: #viewport-topdown not in DOM');
+    this.container = paneSlot as HTMLDivElement;
+    this.container.innerHTML = '';
     this.container.hidden = true;
     this.canvas = document.createElement('canvas');
     this.canvas.className = 'topdown-canvas';
     this.container.appendChild(this.canvas);
     const labelEl = document.createElement('div');
     labelEl.className = 'topdown-label';
-    labelEl.textContent = '▤ Top-Down (orthographic)';
+    labelEl.textContent = '▤ Top-Down · RMB drag pans · wheel zooms · dbl-click frames all';
     this.container.appendChild(labelEl);
-    hostEl.appendChild(this.container);
 
     this.renderer = new THREE.WebGLRenderer({ canvas: this.canvas, antialias: true });
     this.renderer.setPixelRatio(Math.min(window.devicePixelRatio, 2));
@@ -63,7 +66,13 @@ export class TopDownView {
     this.active = on;
     this.container.hidden = !on;
     this.hostEl.classList.toggle('has-topdown', on);
-    if (on) this.resize();
+    if (on) {
+      // Resize on next frame after layout has updated for the new grid.
+      requestAnimationFrame(() => {
+        this.resize();
+        this.frameAll();
+      });
+    }
   }
 
   isActive(): boolean {
@@ -72,6 +81,16 @@ export class TopDownView {
 
   tick() {
     if (!this.active) return;
+    // Re-check size each tick — getBoundingClientRect is robust against
+    // layout glitches that aren't caught by ResizeObserver alone.
+    const rect = this.canvas.getBoundingClientRect();
+    if (rect.width > 0 && rect.height > 0) {
+      const cw = Math.round(rect.width);
+      const ch = Math.round(rect.height);
+      if (this.canvas.width !== cw || this.canvas.height !== ch) {
+        this.resize();
+      }
+    }
     // Keep the box helper synced to the selected object's bounds.
     const sel = this.scene.selection;
     if (this.selectedBoxHelper) {
@@ -189,6 +208,10 @@ export class TopDownView {
     const rect = this.container.getBoundingClientRect();
     if (rect.width === 0 || rect.height === 0) return;
     this.renderer.setSize(rect.width, rect.height, false);
+    // Also pin the canvas to fill via inline style — defensive against any
+    // CSS leftover that might force a 0-height.
+    this.canvas.style.width = `${rect.width}px`;
+    this.canvas.style.height = `${rect.height}px`;
     this.updateCameraFrustum();
   }
 }
