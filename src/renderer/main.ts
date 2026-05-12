@@ -298,16 +298,29 @@ const WIREFRAME_TAG = '__wireframeOverlay';
 const wireframeBtn = document.getElementById('wireframe-btn') as HTMLButtonElement;
 
 function addWireframeOverlay(mesh: THREE.Mesh) {
-  // Skip if already wrapped.
+  // Skip if already wrapped or this isn't a mesh that has BufferGeometry.
   if (mesh.children.some((c) => c.userData[WIREFRAME_TAG])) return;
-  const edges = new THREE.EdgesGeometry(mesh.geometry, 25);
+  if (!mesh.geometry) return;
+  // Use a low angle threshold (1°) so coplanar quad diagonals stay hidden
+  // but anything that's actually a real edge shows up — including imported
+  // GLBs which sometimes have slight float drift between adjacent triangles.
+  const edges = new THREE.EdgesGeometry(mesh.geometry, 1);
+  // Bright cyan, on top of everything, no depth test → wires always visible
+  // regardless of camera angle or distance. Linewidth >1 doesn't work on
+  // WebGL but the contrast color is enough on the dark UI palette.
   const lines = new THREE.LineSegments(
     edges,
-    new THREE.LineBasicMaterial({ color: 0x4cf8c5 }),
+    new THREE.LineBasicMaterial({
+      color: 0x4cf8c5,
+      depthTest: false,
+      depthWrite: false,
+      transparent: true,
+      opacity: 1,
+    }),
   );
   lines.userData[WIREFRAME_TAG] = true;
   lines.userData.deletable = false;
-  lines.renderOrder = 998;
+  lines.renderOrder = 999;
   mesh.add(lines);
 }
 
