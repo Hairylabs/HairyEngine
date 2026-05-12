@@ -62,7 +62,8 @@ import {
   latticeDeform,
   editPivot,
 } from './engine/ModelingTools';
-import { buildPaintballArena, makePaintGun, makePaintPlayer } from './engine/Paintball';
+import { buildPaintballArena, makePaintGun, makePaintPlayer, makePaintTurret } from './engine/Paintball';
+import { promptModal, confirmModal } from './ui/Dialog';
 import { installCrashHelper, getStashedCrashSnapshot, clearStashedCrash } from './engine/CrashHelper';
 import { LevelsManager } from './engine/Levels';
 import { listLibraryAnimations, applyBuiltinClip, importAnimationFile } from './engine/MixamoLibrary';
@@ -220,8 +221,12 @@ function renderLevelsBar() {
   const addBtn = document.createElement('button');
   addBtn.className = 'level-chip-add';
   addBtn.textContent = '+ New Level';
-  addBtn.addEventListener('click', () => {
-    const name = prompt('Name for the new level?', `Level${state.levels.length + 1}`);
+  addBtn.addEventListener('click', async () => {
+    const name = await promptModal({
+      title: 'New Level',
+      defaultValue: `Level${state.levels.length + 1}`,
+      okLabel: 'Create',
+    });
     if (!name) return;
     levels.add(name);
     status.setStatus(`Created level "${name}"`);
@@ -231,9 +236,13 @@ function renderLevelsBar() {
 levels.onChange(() => renderLevelsBar());
 renderLevelsBar();
 
-document.getElementById('levels-rename')?.addEventListener('click', () => {
+document.getElementById('levels-rename')?.addEventListener('click', async () => {
   const state = levels.getState();
-  const name = prompt('Rename level to?', state.levels[state.currentLevel].name);
+  const name = await promptModal({
+    title: 'Rename Level',
+    defaultValue: state.levels[state.currentLevel].name,
+    okLabel: 'Rename',
+  });
   if (!name) return;
   levels.rename(state.currentLevel, name);
 });
@@ -245,13 +254,19 @@ document.getElementById('levels-duplicate')?.addEventListener('click', () => {
     status.setStatus('Level duplicated');
   }
 });
-document.getElementById('levels-delete')?.addEventListener('click', () => {
+document.getElementById('levels-delete')?.addEventListener('click', async () => {
   const state = levels.getState();
   if (state.levels.length <= 1) {
     status.setStatus('Cannot delete the only level');
     return;
   }
-  if (!confirm(`Delete level "${state.levels[state.currentLevel].name}"? This cannot be undone.`)) return;
+  const ok = await confirmModal({
+    title: 'Delete Level',
+    message: `Delete level "${state.levels[state.currentLevel].name}"? This cannot be undone.`,
+    okLabel: 'Delete',
+    danger: true,
+  });
+  if (!ok) return;
   if (levels.remove(state.currentLevel)) {
     status.setStatus('Level deleted');
   }
@@ -1064,9 +1079,14 @@ modelingBtn.addEventListener('click', () => {
 
 // --- Paintball arena bootstrap --------------------------------------------
 const paintballBtn = document.getElementById('paintball-btn') as HTMLButtonElement;
-paintballBtn.addEventListener('click', () => {
+paintballBtn.addEventListener('click', async () => {
   showGuide('paintball');
-  if (!confirm('Build a starter paintball arena? This adds a floor, boundary walls, cover boxes, two spawn points, and a starter player to the scene.')) return;
+  const ok = await confirmModal({
+    title: 'Build Paintball Arena',
+    message: 'Add a 30 m floor, boundary walls, 6 cover boxes, two spawn points, and a starter player to the current level?',
+    okLabel: 'Build',
+  });
+  if (!ok) return;
   try {
     const n = buildPaintballArena(scene, history);
     status.setStatus(`Built paintball arena (${n} objects). Press ▶ to play, click to shoot.`);
@@ -1370,6 +1390,7 @@ addBtn.addEventListener('click', () => {
     { label: '🎯 Paint Player (Red)', onClick: () => addAndSelect(makePaintPlayer('red')) },
     { label: '🎯 Paint Player (Blue)', onClick: () => addAndSelect(makePaintPlayer('blue')) },
     { label: '🔫 Paint Gun', onClick: () => addAndSelect(makePaintGun()) },
+    { label: '🛡 Paint Turret (auto-shoot)', onClick: () => addAndSelect(makePaintTurret('blue')) },
     { sep: true },
     { label: '▮ Wall', onClick: () => addAndSelect(makeWall()) },
     { label: '▭ Floor', onClick: () => addAndSelect(makeFloor()) },

@@ -184,29 +184,34 @@ export function extrudeCluster(
     topMap.set(v, nextIdx++);
   }
 
-  // Rewrite cluster faces to use top-ring indices.
+  // Build the new index buffer. Strategy:
+  //   1. KEEP every existing triangle (including the cluster ones) — this
+  //      preserves the bottom of the extruded region so we don't punch a
+  //      hole through the mesh. Previously we rewrote cluster faces to use
+  //      top verts, which left an open base.
+  //   2. ADD new triangles that match the cluster topology but use top-ring
+  //      indices — these form the visible top of the extruded pillar.
+  //   3. Stitch side walls between the boundary and its top twin.
   const newIndices: number[] = [];
-  const clusterSet = new Set(cluster.faceIndices);
   const triCount = idx.count / 3;
   for (let t = 0; t < triCount; t++) {
+    newIndices.push(idx.getX(t * 3), idx.getX(t * 3 + 1), idx.getX(t * 3 + 2));
+  }
+  // Top cap — duplicate each cluster face using the top-ring verts.
+  for (const t of cluster.faceIndices) {
     const a = idx.getX(t * 3);
     const b = idx.getX(t * 3 + 1);
     const c = idx.getX(t * 3 + 2);
-    if (clusterSet.has(t)) {
-      newIndices.push(topMap.get(a)!, topMap.get(b)!, topMap.get(c)!);
-    } else {
-      newIndices.push(a, b, c);
-    }
+    newIndices.push(topMap.get(a)!, topMap.get(b)!, topMap.get(c)!);
   }
 
   // Stitch side quads: for each boundary edge (a,b), the original edge stays
   // on the bottom ring, the corresponding top edge is (top(a), top(b)).
-  // Two triangles per quad, winding chosen so the outward normal of the
-  // side face points away from the cluster centroid.
+  // Two triangles per quad with consistent winding so the outward face
+  // points away from the cluster centroid.
   for (const [a, b] of cluster.boundaryEdges) {
     const tA = topMap.get(a)!;
     const tB = topMap.get(b)!;
-    // Winding: bottom-a → top-a → top-b, then bottom-a → top-b → bottom-b
     newIndices.push(a, tA, tB);
     newIndices.push(a, tB, b);
   }

@@ -1,6 +1,7 @@
 import * as THREE from 'three';
 import { Scene } from '../engine/Scene';
 import { getActorKind, actorIcon, actorLabel } from '../engine/ActorTaxonomy';
+import { promptModal } from './Dialog';
 
 // Hierarchy panel — full tree view of the scene. Click selects, click the
 // twirl-down chevron expands/collapses, drag-and-drop reparents (Unity /
@@ -299,8 +300,13 @@ export class HierarchyPanel {
     });
   }
 
-  private promptRename(obj: THREE.Object3D) {
-    const name = prompt(`Rename "${obj.name}" to?`, obj.name);
+  private async promptRename(obj: THREE.Object3D) {
+    const name = await promptModal({
+      title: `Rename "${obj.name}"`,
+      defaultValue: obj.name,
+      placeholder: 'New name',
+      okLabel: 'Rename',
+    });
     if (!name) return;
     obj.name = name.trim().slice(0, 64);
     this.scene.notifyChanged();

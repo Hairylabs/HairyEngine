@@ -200,6 +200,66 @@ export function buildPaintballArena(scene: Scene, history: History): number {
   return created.length;
 }
 
+/** Drop-in paintball turret — a mounted gun on a pedestal, pre-wired with
+ *  LockOn (auto-target nearest "Player") + AutoShoot (fires while locked).
+ *  No setup required: drop it in the scene, press Play, it tracks + fires. */
+export function makePaintTurret(team: 'red' | 'blue' = 'blue'): THREE.Group {
+  const group = new THREE.Group();
+  group.name = team === 'red' ? 'PaintTurret_Red' : 'PaintTurret_Blue';
+  group.position.set(0, 0, 0);
+
+  // Pedestal — short cylinder so the turret has presence.
+  const pedestal = new THREE.Mesh(
+    new THREE.CylinderGeometry(0.5, 0.6, 0.8, 16),
+    new THREE.MeshStandardMaterial({ color: 0x444a55, roughness: 0.6 }),
+  );
+  pedestal.position.set(0, 0.4, 0);
+  pedestal.castShadow = true;
+  pedestal.receiveShadow = true;
+  pedestal.name = 'TurretBase';
+  group.add(pedestal);
+
+  // Mounted gun — same geometry as makePaintGun but parented to the head.
+  const head = new THREE.Group();
+  head.position.set(0, 1.0, 0);
+  head.name = 'TurretHead';
+  const body = new THREE.Mesh(
+    new THREE.BoxGeometry(0.3, 0.25, 0.5),
+    new THREE.MeshStandardMaterial({ color: 0x222533, roughness: 0.7 }),
+  );
+  body.castShadow = true;
+  head.add(body);
+  const barrel = new THREE.Mesh(
+    new THREE.CylinderGeometry(0.05, 0.05, 0.7, 16),
+    new THREE.MeshStandardMaterial({
+      color: 0x4a4f5e, roughness: 0.4, metalness: 0.6,
+    }),
+  );
+  barrel.rotation.x = Math.PI / 2;
+  barrel.position.set(0, 0.07, -0.45);
+  barrel.castShadow = true;
+  head.add(barrel);
+  const tint = team === 'red' ? 0xff3a8c : 0x4cf8c5;
+  const hopper = new THREE.Mesh(
+    new THREE.SphereGeometry(0.1, 16, 12),
+    new THREE.MeshStandardMaterial({ color: tint, roughness: 0.5 }),
+  );
+  hopper.position.set(0, 0.22, 0);
+  hopper.castShadow = true;
+  head.add(hopper);
+  group.add(head);
+
+  // The LockOn + AutoShoot scripts run on the WHOLE group so the entire
+  // turret rotates to face the target.
+  group.userData.__team = team;
+  group.userData.__scripts = [
+    { type: 'LockOn', params: { targetName: 'Player', range: 25, smoothing: 0.15, lockY: true } },
+    { type: 'AutoShoot', params: { rate: 2, speed: 25, color: tint, requireTarget: true } },
+  ];
+  setActorKind(group, 'hero');
+  return group;
+}
+
 function makeSpawnMarker(name: string, color: number, position: THREE.Vector3): THREE.Group {
   const group = new THREE.Group();
   group.name = name;

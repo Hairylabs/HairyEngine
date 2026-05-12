@@ -5,6 +5,7 @@ import { History as UndoHistory } from '../engine/History';
 import { AddObjectCommand } from '../engine/Commands';
 import { attachAnimations } from '../engine/Animations';
 import { listUserScripts, openScriptEditor } from '../engine/UserScripts';
+import { promptModal, confirmModal } from './Dialog';
 
 // Asset Browser — folder tree view. Files are auto-grouped into default
 // folders by extension (Models / Textures / Audio / Scripts / Animations /
@@ -293,9 +294,11 @@ export class AssetPanel {
       if (entry.path.startsWith('script:')) {
         const id = entry.path.replace(/^script:/, '');
         items.push({ label: `✎ Edit "${entry.name}"`, onClick: () => openScriptEditor(id, () => this.refresh()) });
+        items.push({ label: '✏ Rename…', onClick: () => this.renameAsset(entry) });
         items.push({ label: '🗑 Delete script', onClick: () => this.deleteScript(id), danger: true });
       } else {
         items.push({ label: '▶ Spawn into scene', onClick: () => this.spawnAsset(entry) });
+        items.push({ label: '✏ Rename…', onClick: () => this.renameAsset(entry) });
         items.push({ label: '↗ Reveal in Explorer', onClick: () => window.hairy.assets.reveal(entry.path) });
       }
       items.push({ sep: true });
@@ -362,8 +365,13 @@ export class AssetPanel {
     }
   }
 
-  private createNewFolder() {
-    const name = prompt('Name for the new folder?', 'MyFolder');
+  private async createNewFolder() {
+    const name = await promptModal({
+      title: 'New Folder',
+      message: 'Name for the new folder',
+      defaultValue: 'MyFolder',
+      okLabel: 'Create',
+    });
     if (!name) return;
     const trimmed = name.trim().slice(0, 32);
     if (!trimmed) return;
@@ -377,10 +385,15 @@ export class AssetPanel {
     this.onMessage(`Created folder "${trimmed}"`);
   }
 
-  private deleteCustomFolder(name: FolderName) {
-    if (!confirm(`Delete folder "${name}"? Files inside will revert to their auto-category.`)) return;
+  private async deleteCustomFolder(name: FolderName) {
+    const ok = await confirmModal({
+      title: 'Delete folder',
+      message: `Delete folder "${name}"? Files inside will revert to their auto-category.`,
+      okLabel: 'Delete',
+      danger: true,
+    });
+    if (!ok) return;
     this.customFolders = this.customFolders.filter((f) => f !== name);
-    // Clear any tags pointing at this folder
     for (const [path, tag] of Object.entries(this.fileTags)) {
       if (tag === name) delete this.fileTags[path];
     }
@@ -388,10 +401,15 @@ export class AssetPanel {
     this.render();
   }
 
-  private promptMoveToFolder(entry: Entry) {
+  private async promptMoveToFolder(entry: Entry) {
     const folders = [...DEFAULT_FOLDERS, ...this.customFolders];
     const list = folders.map((f, i) => `${i + 1}. ${f}`).join('\n');
-    const choice = prompt(`Move "${entry.name}" to which folder?\n\n${list}\n\nType the number or name:`, '');
+    const choice = await promptModal({
+      title: `Move "${entry.name}"`,
+      message: `Type folder name or number:\n${list}`,
+      placeholder: 'Models / Textures / 3 / MyFolder…',
+      okLabel: 'Move',
+    });
     if (!choice) return;
     const trimmed = choice.trim();
     const idx = parseInt(trimmed);
@@ -404,6 +422,42 @@ export class AssetPanel {
     this.saveFolders();
     this.render();
     this.onMessage(`Moved "${entry.name}" → ${folder}`);
+  }
+
+  /** Rename an asset. Scripts can be renamed in-place via UserScripts; for
+   *  real files we don't have a server-side rename IPC yet, so we offer to
+   *  reveal them in Explorer where the user can F2-rename them. */
+  private async renameAsset(entry: Entry) {
+    if (entry.path.startsWith('script:')) {
+      const id = entry.path.replace(/^script:/, '');
+      const mod = await import('../engine/UserScripts');
+      const script = mod.getUserScript(id);
+      if (!script) return;
+      const newName = await promptModal({
+        title: 'Rename script',
+        defaultValue: script.name,
+        placeholder: 'New script name',
+        okLabel: 'Rename',
+      });
+      if (!newName) return;
+      mod.saveUserScript({
+        id: script.id,
+        name: newName.trim().slice(0, 32),
+        type: newName.replace(/\s+/g, ''),
+        body: script.body,
+        enabled: script.enabled,
+      });
+      this.onMessage(`Renamed → "${newName.trim()}"`);
+      this.refresh();
+      return;
+    }
+    // For real files: open Explorer so the user can rename via OS.
+    const ok = await confirmModal({
+      title: 'Rename file',
+      message: `File renaming isn't wired through the IPC yet. Open the asset folder in Explorer so you can rename "${entry.name}" with F2?`,
+      okLabel: 'Open folder',
+    });
+    if (ok) window.hairy.assets.reveal(entry.path);
   }
 
   private async deleteScript(id: string) {
