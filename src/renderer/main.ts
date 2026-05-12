@@ -325,16 +325,34 @@ function closeFloat(which: 'claude' | 'blender') {
     blenderBtn.classList.remove('active');
   }
 }
-// Event delegation on document so we don't depend on when the buttons get
-// added to the DOM, and so clicks on the inner ✕ text still match the button.
+// Belt + braces. (1) Direct click listener on each known button id. (2) An
+// event-delegation listener as fallback in case the button was replaced or a
+// click lands on an inner text node. Either path fires closeFloat exactly once
+// (stopPropagation prevents the doc-level handler from firing if the direct
+// one already did).
+function wireCloseDirect(id: string, which: 'claude' | 'blender') {
+  const btn = document.getElementById(id);
+  if (!btn) return;
+  btn.addEventListener('click', (e) => {
+    e.preventDefault();
+    e.stopPropagation();
+    closeFloat(which);
+  });
+}
+wireCloseDirect('float-claude-close', 'claude');
+wireCloseDirect('float-blender-close', 'blender');
 document.addEventListener('click', (e) => {
-  const target = (e.target as HTMLElement | null)?.closest(
+  // Walk up from the click target to find an Element (text-node clicks).
+  let node: Node | null = e.target as Node | null;
+  while (node && !(node instanceof Element)) node = node.parentNode;
+  if (!node) return;
+  const hit = (node as Element).closest(
     '#float-claude-close, #float-blender-close',
-  ) as HTMLElement | null;
-  if (!target) return;
+  );
+  if (!hit) return;
   e.preventDefault();
   e.stopPropagation();
-  closeFloat(target.id === 'float-claude-close' ? 'claude' : 'blender');
+  closeFloat(hit.id === 'float-claude-close' ? 'claude' : 'blender');
 });
 // Escape closes any open floating panel.
 window.addEventListener('keydown', (e) => {

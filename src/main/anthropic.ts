@@ -199,6 +199,39 @@ const hairyMcpServer = createSdkMcpServer({
       {},
       async () => invokeEngineTool('engine_list_scene', {}),
     ),
+    tool(
+      'engine_attach_script',
+      "Attach a built-in script (component) to a named object in the HairyEngine scene. Available scripts: Rotator, PlayerController, CharacterController, Rigidbody, AnimationPlayer, Crosshair, Shooter, ParticleEmitter, MainCamera, FollowCamera, AttachToBone.",
+      {
+        objectName: z
+          .string()
+          .describe('Name of the object to attach the script to (must exist in scene).'),
+        scriptType: z
+          .string()
+          .describe('Script type, e.g. "Rotator" or "Shooter".'),
+        params: z
+          .record(z.string(), z.unknown())
+          .optional()
+          .describe('Optional script parameters keyed by param name.'),
+      },
+      async (args) => invokeEngineTool('engine_attach_script', args as Record<string, unknown>),
+    ),
+    tool(
+      'engine_create_behavior',
+      "Create a new custom behavior on a named object from a JavaScript snippet. Use this when the built-in scripts don't cover what the user wants. The code runs in Play Mode with these variables in scope: `owner` (the Object3D), `scene` (.three is the THREE.Scene), `input` (Input singleton with isKeyDown/isMouseDown/getMouseDelta), `camera` (the active camera), `THREE` (the namespace), and `dt` (seconds, passed each frame). Provide a body that runs every frame. Example body: \"owner.rotation.y += dt; if (input.isKeyDown('e')) (owner.material as any).color.set('#ff0000');\"",
+      {
+        objectName: z
+          .string()
+          .describe('Name of the object to attach the behavior to (must exist in scene).'),
+        behaviorName: z
+          .string()
+          .describe('Short descriptive label for the behavior (e.g. "spin and shoot").'),
+        body: z
+          .string()
+          .describe('JavaScript body. Runs every frame. `owner`, `scene`, `input`, `camera`, `THREE`, `dt` are in scope.'),
+      },
+      async (args) => invokeEngineTool('engine_create_behavior', args as Record<string, unknown>),
+    ),
   ],
 });
 
@@ -207,6 +240,8 @@ const ALLOWED_TOOLS = [
   'mcp__hairy__blender_get_scene_info',
   'mcp__hairy__engine_add_primitive',
   'mcp__hairy__engine_list_scene',
+  'mcp__hairy__engine_attach_script',
+  'mcp__hairy__engine_create_behavior',
 ];
 
 function conversationsDir() {
