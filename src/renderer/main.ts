@@ -51,6 +51,15 @@ import {
 import { Multiplayer } from './engine/Multiplayer';
 import { PonksDrawer } from './ui/PonksDrawer';
 import { FaceExtrude } from './engine/FaceExtrude';
+import { TopDownView } from './engine/TopDownView';
+import {
+  extrudePoly,
+  extrudePath,
+  warpMesh,
+  latticeDeform,
+  editPivot,
+} from './engine/ModelingTools';
+import { buildPaintballArena, makePaintGun, makePaintPlayer } from './engine/Paintball';
 
 const canvas = document.getElementById('canvas-3d') as HTMLCanvasElement;
 const viewportEl = canvas.parentElement as HTMLElement;
@@ -753,6 +762,93 @@ document.getElementById('scatter-btn')?.addEventListener('click', () => {
   }
 });
 
+// --- Sprint 5 v3: Top-down split viewport ---------------------------------
+const topdownBtn = document.getElementById('topdown-btn') as HTMLButtonElement;
+const topdown = new TopDownView(viewportEl, scene, (obj) => {
+  scene.select(obj);
+});
+topdownBtn.addEventListener('click', () => {
+  const next = !topdown.isActive();
+  topdown.setActive(next);
+  topdownBtn.classList.toggle('active', next);
+  status.setStatus(next ? 'Top-down split ON — RMB drag pans, wheel zooms, dbl-click frames all' : 'Top-down split OFF');
+});
+
+// --- UE5 modeling tools popup ---------------------------------------------
+const modelingBtn = document.getElementById('modeling-btn') as HTMLButtonElement;
+modelingBtn.addEventListener('click', () => {
+  // Close any existing popup first.
+  document.querySelectorAll('.modeling-popup').forEach((p) => p.remove());
+  const popup = document.createElement('div');
+  popup.className = 'modeling-popup';
+  popup.innerHTML = `
+    <div class="mp-hint">UE5-style modeling — applies to the selected mesh</div>
+    <button data-op="extrude-x">⇄ Extrude Poly +X (1m)</button>
+    <button data-op="extrude-y">↕ Extrude Poly +Y (1m)</button>
+    <button data-op="extrude-z">⇕ Extrude Poly +Z (1m)</button>
+    <div class="mp-sep"></div>
+    <button data-op="extrude-path">≈ Extrude Path (8 along sine)</button>
+    <div class="mp-sep"></div>
+    <button data-op="warp">∿ Warp (bend on Y)</button>
+    <button data-op="lattice">▦ Lattice (taper/twist/bulge)</button>
+    <div class="mp-sep"></div>
+    <button data-op="pivot-center">⊕ Edit Pivot → Center</button>
+    <button data-op="pivot-bottom">⊥ Edit Pivot → Bottom</button>
+  `;
+  const rect = modelingBtn.getBoundingClientRect();
+  popup.style.left = `${rect.left}px`;
+  popup.style.top = `${rect.bottom + 4}px`;
+  document.body.appendChild(popup);
+
+  popup.addEventListener('click', (e) => {
+    const target = (e.target as HTMLElement).closest('button[data-op]') as HTMLButtonElement | null;
+    if (!target) return;
+    const op = target.dataset.op!;
+    try {
+      let ok = false;
+      switch (op) {
+        case 'extrude-x': ok = extrudePoly(scene, history, 'x', 1); break;
+        case 'extrude-y': ok = extrudePoly(scene, history, 'y', 1); break;
+        case 'extrude-z': ok = extrudePoly(scene, history, 'z', 1); break;
+        case 'extrude-path': ok = extrudePath(scene, history); break;
+        case 'warp': ok = warpMesh(scene, history); break;
+        case 'lattice': ok = latticeDeform(scene, history); break;
+        case 'pivot-center': ok = editPivot(scene, history, 'center'); break;
+        case 'pivot-bottom': ok = editPivot(scene, history, 'bottom'); break;
+      }
+      status.setStatus(ok ? `Applied: ${target.textContent?.trim()}` : 'Select a mesh first');
+    } catch (err) {
+      console.error('[modeling]', err);
+      status.setStatus(`Modeling op failed: ${(err as Error).message}`);
+    }
+    popup.remove();
+  });
+
+  // Close on outside click
+  setTimeout(() => {
+    const onAway = (ev: MouseEvent) => {
+      if (!popup.contains(ev.target as Node)) {
+        popup.remove();
+        document.removeEventListener('click', onAway);
+      }
+    };
+    document.addEventListener('click', onAway);
+  }, 0);
+});
+
+// --- Paintball arena bootstrap --------------------------------------------
+const paintballBtn = document.getElementById('paintball-btn') as HTMLButtonElement;
+paintballBtn.addEventListener('click', () => {
+  if (!confirm('Build a starter paintball arena? This adds a floor, boundary walls, cover boxes, two spawn points, and a starter player to the scene.')) return;
+  try {
+    const n = buildPaintballArena(scene, history);
+    status.setStatus(`Built paintball arena (${n} objects). Press ▶ to play, click to shoot.`);
+  } catch (err) {
+    console.error('[paintball]', err);
+    status.setStatus(`Arena build failed: ${(err as Error).message}`);
+  }
+});
+
 // Multiplayer connect toggle
 const mpBtn = document.getElementById('multiplayer-btn') as HTMLButtonElement;
 mpBtn.addEventListener('click', async () => {
@@ -805,6 +901,7 @@ viewport.start((dt, fps) => {
   status.setFps(fps);
   inspector.tick();
   multiplayer.tick(dt);
+  topdown.tick();
 });
 
 // Hotkeys not handled inside Gizmo/EditorCamera
@@ -960,6 +1057,10 @@ addBtn.addEventListener('click', () => {
   openMenuPopup(addBtn, [
     { label: '👤 Character (FPS)', onClick: () => addAndSelect(makeFPSPlayer()) },
     { label: '◆ Spawn Point', onClick: () => addAndSelect(makeSpawnPoint()) },
+    { sep: true },
+    { label: '🎯 Paint Player (Red)', onClick: () => addAndSelect(makePaintPlayer('red')) },
+    { label: '🎯 Paint Player (Blue)', onClick: () => addAndSelect(makePaintPlayer('blue')) },
+    { label: '🔫 Paint Gun', onClick: () => addAndSelect(makePaintGun()) },
     { sep: true },
     { label: '▮ Wall', onClick: () => addAndSelect(makeWall()) },
     { label: '▭ Floor', onClick: () => addAndSelect(makeFloor()) },

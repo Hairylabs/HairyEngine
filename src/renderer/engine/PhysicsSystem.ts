@@ -64,6 +64,12 @@ export class PhysicsSystem {
     this.bodies.push(handle);
   }
 
+  /** Look up the BodyHandle for a given owner Object3D. Used by PaintImpact
+   *  to set initial velocity once Rapier has finished registering the body. */
+  findHandle(owner: THREE.Object3D): BodyHandle | null {
+    return this.bodies.find((h) => h.owner === owner) ?? null;
+  }
+
   removeBody(body: RAPIER.RigidBody) {
     if (!this.world) return;
     const idx = this.bodies.findIndex((h) => h.body === body);

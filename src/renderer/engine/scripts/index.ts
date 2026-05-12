@@ -14,3 +14,5 @@ import './FollowCamera';
 import './AttachToBone';
 import './AudioListener';
 import './AudioSource';
+import './PaintShooter';
+import './PaintImpact';
