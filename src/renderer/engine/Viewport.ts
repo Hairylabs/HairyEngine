@@ -133,13 +133,15 @@ export class Viewport {
       if (this.play.isPlaying()) {
         // In Play Mode: physics ticks first (so positions are fresh for scripts
         // that read them), then scripts drive the world (which may move
-        // kinematic bodies), then animations advance the skeletal state.
+        // kinematic bodies).
         this.physics.step(dt);
         this.scriptSystem.update(dt);
-        this.animations.update(dt);
       } else {
         this.editorCamera.update(dt);
       }
+      // Animations tick in both edit + play mode so the Mixamo-style preview
+      // buttons in the Selection toolbar can scrub clips without entering Play.
+      this.animations.update(dt);
       // Re-render with the active camera. Composer was wired with this.camera
       // at construction so for scene cameras we use renderer directly to bypass
       // the composer cache. (Outline pass still works for editor camera.)

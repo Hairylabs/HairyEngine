@@ -213,8 +213,22 @@ function applyWireframe(on: boolean) {
 wireframeBtn.addEventListener('click', () => {
   wireframeOn = !wireframeOn;
   wireframeBtn.classList.toggle('active', wireframeOn);
+  // Always clear first, then re-add if turning on. Defeats any stale overlay
+  // state (e.g. extruded mesh kept the old box's edges).
+  removeWireframeOverlays(scene.editable);
   applyWireframe(wireframeOn);
-  status.setStatus(wireframeOn ? 'Wireframe ON (edges only)' : 'Wireframe OFF');
+  const count = wireframeOn
+    ? scene.editable.children.reduce((n, c) => {
+        let k = 0;
+        c.traverse((o) => {
+          if ((o as THREE.Mesh).isMesh) k++;
+        });
+        return n + k;
+      }, 0)
+    : 0;
+  status.setStatus(
+    wireframeOn ? `Wireframe ON (${count} meshes outlined)` : 'Wireframe OFF',
+  );
 });
 // Re-apply when scene changes so newly-added meshes inherit the state and
 // re-extruded meshes get fresh overlays at the new geometry.
@@ -500,8 +514,76 @@ function updateSelToolbar(obj: THREE.Object3D | null) {
   }
   selToolbar.hidden = false;
   selLabel.textContent = obj.name || obj.type;
+  renderAnimationButtons(obj);
 }
 scene.onSelectionChanged((obj) => updateSelToolbar(obj));
+
+// Animation buttons — Mixamo-style preview. When the selected object (or any
+// of its descendants) shipped with AnimationClips, render one button per clip.
+// Click → play that clip on the selected character. "Stop" pauses everything.
+function renderAnimationButtons(obj: THREE.Object3D) {
+  const container = document.getElementById('sel-anim-buttons') as HTMLElement;
+  const divider = document.getElementById('sel-anim-divider') as HTMLElement;
+  const label = document.getElementById('sel-anim-label') as HTMLElement;
+  container.innerHTML = '';
+
+  // Walk down to find a SkinnedMesh ancestor of clip-bearing object.
+  // attachAnimations stores clips keyed on the root we imported, so use
+  // listAnimationNames() to detect.
+  // Search self + ancestors + direct descendants for any with clips.
+  const candidates: THREE.Object3D[] = [obj];
+  obj.traverse((c) => candidates.push(c));
+  let clipsHost: THREE.Object3D | null = null;
+  for (const c of candidates) {
+    if (Array.isArray(c.userData.__animationNames) && c.userData.__animationNames.length > 0) {
+      clipsHost = c;
+      break;
+    }
+  }
+  if (!clipsHost) {
+    divider.hidden = true;
+    label.hidden = true;
+    return;
+  }
+  divider.hidden = false;
+  label.hidden = false;
+
+  const names = clipsHost.userData.__animationNames as string[];
+  for (const name of names) {
+    const btn = document.createElement('button');
+    btn.className = 'sel-btn';
+    btn.textContent = name.length > 14 ? name.slice(0, 12) + '…' : name;
+    btn.title = `Play "${name}" on ${clipsHost.name}`;
+    btn.addEventListener('click', () => playClipOn(clipsHost as THREE.Object3D, name));
+    container.appendChild(btn);
+  }
+  const stopBtn = document.createElement('button');
+  stopBtn.className = 'sel-btn';
+  stopBtn.textContent = '⏹ Stop';
+  stopBtn.title = 'Stop all clips on this character';
+  stopBtn.addEventListener('click', () => stopClipsOn(clipsHost as THREE.Object3D));
+  container.appendChild(stopBtn);
+}
+
+async function playClipOn(owner: THREE.Object3D, clipName: string) {
+  const { getAnimations } = await import('./engine/Animations');
+  const clips = getAnimations(owner);
+  const clip = clips.find((c) => c.name === clipName);
+  if (!clip) {
+    status.setStatus(`No clip "${clipName}" on ${owner.name}`);
+    return;
+  }
+  const mixer = viewport.animations.getMixer(owner);
+  mixer.stopAllAction();
+  const action = mixer.clipAction(clip);
+  action.setLoop(THREE.LoopRepeat, Infinity);
+  action.reset().play();
+  status.setStatus(`Playing "${clipName}" on ${owner.name}`);
+}
+function stopClipsOn(owner: THREE.Object3D) {
+  viewport.animations.getMixer(owner).stopAllAction();
+  status.setStatus(`Stopped animations on ${owner.name}`);
+}
 
 document.getElementById('sel-duplicate')?.addEventListener('click', () => {
   try {
@@ -795,7 +877,60 @@ window.addEventListener('keydown', (e) => {
     }
     return;
   }
+
+  // Group / Ungroup (Ctrl+G / Shift+Ctrl+G)
+  if ((e.ctrlKey || e.metaKey) && e.key.toLowerCase() === 'g' && !isEditableTarget(e.target)) {
+    e.preventDefault();
+    if (e.shiftKey) ungroupSelection();
+    else groupSelection();
+    return;
+  }
 });
+
+// Group: wraps the selected object + any siblings the user shift-selected
+// (multi-select still pending) into a new Group at the centroid.
+// For now (single-select only) we wrap just the selection in a Group so
+// that further actions treat it as one unit.
+function groupSelection() {
+  const sel = scene.selection;
+  if (!sel) return;
+  if (sel.userData.deletable === false) {
+    status.setStatus(`"${sel.name}" cannot be grouped`);
+    return;
+  }
+  const parent = sel.parent;
+  if (!parent) return;
+  const group = new THREE.Group();
+  group.name = `${sel.name}_group`;
+  // World-space center → group origin
+  const box = new THREE.Box3().setFromObject(sel);
+  const center = box.getCenter(new THREE.Vector3());
+  group.position.copy(center);
+  parent.add(group);
+  // Reparent sel into group with adjusted local position
+  group.attach(sel);
+  scene.notifyChanged();
+  scene.select(group);
+  status.setStatus(`Grouped "${sel.name}" into "${group.name}"`);
+}
+function ungroupSelection() {
+  const sel = scene.selection;
+  if (!sel) return;
+  if (!(sel as THREE.Group).isGroup) {
+    status.setStatus('Ungroup needs a Group selected');
+    return;
+  }
+  const parent = sel.parent;
+  if (!parent) return;
+  // Move children up to parent, preserving world transforms
+  const children = sel.children.slice();
+  for (const c of children) {
+    parent.attach(c);
+  }
+  scene.removeInternal(sel);
+  scene.notifyChanged();
+  status.setStatus(`Ungrouped "${sel.name}"`);
+}
 
 // Clipboard for copy/paste — stores a reference to the source object;
 // each paste does a deep `.clone(true)` so further edits to the clipboard
@@ -823,7 +958,7 @@ function isEditableTarget(target: EventTarget | null): boolean {
 const addBtn = document.getElementById('menu-add') as HTMLButtonElement;
 addBtn.addEventListener('click', () => {
   openMenuPopup(addBtn, [
-    { label: '👤 FPS Player', onClick: () => addAndSelect(makeFPSPlayer()) },
+    { label: '👤 Character (FPS)', onClick: () => addAndSelect(makeFPSPlayer()) },
     { label: '◆ Spawn Point', onClick: () => addAndSelect(makeSpawnPoint()) },
     { sep: true },
     { label: '▮ Wall', onClick: () => addAndSelect(makeWall()) },

@@ -848,6 +848,12 @@ button:hover { background: #25253a; }
   letter-spacing: 0.05em;
   padding: 0 2px;
 }
+.sel-anim-buttons {
+  display: flex;
+  gap: 4px;
+  flex-wrap: wrap;
+}
+.sel-anim-buttons:empty { display: none; }
 
 /* Play mode overlay — green border on the viewport so it's obvious we're running */
 .viewport.is-playing::before {
