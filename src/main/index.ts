@@ -283,8 +283,13 @@ function registerIpc() {
   ipcMain.handle('dialog:openGlb', async () => {
     if (!mainWindow) return { canceled: true };
     const result = await dialog.showOpenDialog(mainWindow, {
-      title: 'Import GLB / GLTF',
-      filters: [{ name: '3D models', extensions: ['glb', 'gltf'] }],
+      title: 'Import 3D model',
+      filters: [
+        { name: '3D models', extensions: ['glb', 'gltf', 'fbx', 'obj', 'stl'] },
+        { name: 'GLB / GLTF', extensions: ['glb', 'gltf'] },
+        { name: 'FBX (Mixamo)', extensions: ['fbx'] },
+        { name: 'All files', extensions: ['*'] },
+      ],
       properties: ['openFile'],
     });
     if (result.canceled || result.filePaths.length === 0) return { canceled: true };

@@ -100,7 +100,13 @@ export async function importAsset(
   if (!win) return { canceled: true };
   const result = await dialog.showOpenDialog(win, {
     title: 'Add to asset library',
-    filters: [{ name: '3D models', extensions: ['glb', 'gltf'] }],
+    filters: [
+      { name: 'All assets', extensions: ['glb', 'gltf', 'fbx', 'obj', 'stl', 'png', 'jpg', 'jpeg', 'webp', 'bmp', 'mp3', 'wav', 'ogg', 'm4a'] },
+      { name: '3D models', extensions: ['glb', 'gltf', 'fbx', 'obj', 'stl'] },
+      { name: 'Images', extensions: ['png', 'jpg', 'jpeg', 'webp', 'bmp'] },
+      { name: 'Audio', extensions: ['mp3', 'wav', 'ogg', 'm4a'] },
+      { name: 'All files', extensions: ['*'] },
+    ],
     properties: ['openFile', 'multiSelections'],
   });
   if (result.canceled || result.filePaths.length === 0) return { canceled: true };

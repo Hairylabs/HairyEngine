@@ -1,5 +1,7 @@
 import * as THREE from 'three';
 import { GLTFLoader } from 'three/addons/loaders/GLTFLoader.js';
+import { FBXLoader } from 'three/addons/loaders/FBXLoader.js';
+import { OBJLoader } from 'three/addons/loaders/OBJLoader.js';
 import { Scene } from '../engine/Scene';
 import { History as UndoHistory } from '../engine/History';
 import { AddObjectCommand } from '../engine/Commands';
@@ -35,6 +37,8 @@ const FOLDER_TAGS_KEY = 'hairy.assetTags.v1';
 const COLLAPSED_KEY = 'hairy.assetFoldersCollapsed.v1';
 
 const gltfLoader = new GLTFLoader();
+const fbxLoader = new FBXLoader();
+const objLoader = new OBJLoader();
 
 export class AssetPanel {
   private entries: Entry[] = [];
@@ -253,9 +257,25 @@ export class AssetPanel {
       this.onMessage(`Could not read ${entry.name}: ${r.error}`);
       return;
     }
+    const lower = entry.path.toLowerCase();
     try {
-      const gltf = await gltfLoader.parseAsync(r.bytes, '');
-      const root = gltf.scene;
+      let root: THREE.Object3D;
+      let animations: THREE.AnimationClip[] = [];
+
+      if (lower.endsWith('.fbx')) {
+        // FBXLoader takes an ArrayBuffer and returns a Group with .animations.
+        root = fbxLoader.parse(r.bytes, '');
+        animations = (root as unknown as { animations?: THREE.AnimationClip[] }).animations ?? [];
+      } else if (lower.endsWith('.obj')) {
+        // OBJLoader returns a Group. Decode the buffer as utf-8 text.
+        const text = new TextDecoder().decode(r.bytes);
+        root = objLoader.parse(text);
+      } else {
+        // Default: glTF binary or text.
+        const gltf = await gltfLoader.parseAsync(r.bytes, '');
+        root = gltf.scene;
+        animations = gltf.animations ?? [];
+      }
       root.name = entry.name.replace(/\.[^.]+$/, '');
       root.traverse((o) => {
         const m = o as THREE.Mesh;
@@ -264,11 +284,13 @@ export class AssetPanel {
           m.receiveShadow = true;
         }
       });
-      if (gltf.animations && gltf.animations.length > 0) {
-        attachAnimations(root, gltf.animations);
+      if (animations.length > 0) {
+        attachAnimations(root, animations);
       }
       this.history.push(new AddObjectCommand(this.scene, root));
-      this.onMessage(`Spawned "${root.name}"`);
+      this.onMessage(
+        `Spawned "${root.name}"${animations.length ? ` (${animations.length} anim${animations.length === 1 ? '' : 's'})` : ''}`,
+      );
     } catch (err) {
       this.onMessage(`Spawn failed: ${(err as Error).message}`);
     }

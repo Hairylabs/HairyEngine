@@ -151,18 +151,32 @@ export class DropZone {
       await this.attachAudioSource(path);
       return;
     }
-    // Default: try to parse as a GLB / glTF.
+    // Route by extension. FBX / OBJ have their own loaders.
     const r = await window.hairy.assets.read(path);
     if (!r.ok) {
       this.onMessage(`Could not read asset: ${r.error}`);
       return;
     }
+    const slash = Math.max(path.lastIndexOf('/'), path.lastIndexOf('\\'));
+    const fileName = slash >= 0 ? path.slice(slash + 1) : path;
     try {
-      const gltf = await gltfLoader.parseAsync(r.bytes, '');
-      const root = gltf.scene;
-      const slash = Math.max(path.lastIndexOf('/'), path.lastIndexOf('\\'));
-      const name = slash >= 0 ? path.slice(slash + 1) : path;
-      root.name = name.replace(/\.[^.]+$/, '');
+      let root: THREE.Object3D;
+      let animations: THREE.AnimationClip[] = [];
+      if (lower.endsWith('.fbx')) {
+        const loader = new FBXLoader();
+        root = loader.parse(r.bytes, '');
+        animations = (root as unknown as { animations?: THREE.AnimationClip[] }).animations ?? [];
+      } else if (lower.endsWith('.obj')) {
+        const { OBJLoader } = await import('three/addons/loaders/OBJLoader.js');
+        const loader = new OBJLoader();
+        const text = new TextDecoder().decode(r.bytes);
+        root = loader.parse(text);
+      } else {
+        const gltf = await gltfLoader.parseAsync(r.bytes, '');
+        root = gltf.scene;
+        animations = gltf.animations ?? [];
+      }
+      root.name = fileName.replace(/\.[^.]+$/, '');
       root.traverse((o) => {
         const m = o as THREE.Mesh;
         if (m.isMesh) {
@@ -170,11 +184,11 @@ export class DropZone {
           m.receiveShadow = true;
         }
       });
-      if (gltf.animations && gltf.animations.length > 0) {
-        attachAnimations(root, gltf.animations);
+      if (animations.length > 0) {
+        attachAnimations(root, animations);
       }
       this.history.push(new AddObjectCommand(this.scene, root));
-      this.onMessage(`Spawned "${root.name}"`);
+      this.onMessage(`Spawned "${root.name}"${animations.length ? ` (${animations.length} anim${animations.length === 1 ? '' : 's'})` : ''}`);
     } catch (err) {
       this.onMessage(`Spawn failed: ${(err as Error).message}`);
     }
