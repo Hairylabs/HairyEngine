@@ -1,0 +1,93 @@
+<!doctype html>
+<html lang="en">
+  <head>
+    <meta charset="UTF-8" />
+    <title>HairyEngine α</title>
+    <meta http-equiv="Content-Security-Policy" content="default-src 'self' 'unsafe-inline' 'unsafe-eval' data: blob:; connect-src 'self' ws: http://localhost:* https:" />
+    <link rel="stylesheet" href="./style.css" />
+  </head>
+  <body>
+    <div id="app">
+      <header class="app-header">
+        <div class="brand">
+          <span class="brand-mark">🌿</span>
+          <span class="brand-name">HairyEngine</span>
+          <span class="brand-version">α</span>
+        </div>
+        <div class="app-menu">
+          <button id="menu-file">File</button>
+          <button id="menu-add">+ Add</button>
+          <button id="menu-claude" class="header-chat-btn">💬 Claude</button>
+          <button id="menu-blender" class="header-chat-btn">🤖 Blender</button>
+        </div>
+        <div class="app-status" id="app-status">ready</div>
+      </header>
+      <div class="app-body">
+        <aside class="panel-left" id="panel-hierarchy">
+          <div class="panel-header"><span>Scene</span></div>
+          <div class="panel-content" id="hierarchy-tree"></div>
+        </aside>
+        <section class="center">
+          <main class="viewport">
+            <canvas id="canvas-3d"></canvas>
+            <div class="viewport-toolbar" id="viewport-toolbar">
+              <button data-mode="translate" class="gizmo-btn active" title="Translate (W)">⇄</button>
+              <button data-mode="rotate" class="gizmo-btn" title="Rotate (E)">⟳</button>
+              <button data-mode="scale" class="gizmo-btn" title="Scale (R)">⇲</button>
+              <div class="toolbar-sep"></div>
+              <button id="play-btn" class="play-btn" title="Play">▶</button>
+              <button id="pause-btn" class="play-btn" title="Pause" disabled>❚❚</button>
+              <button id="stop-btn" class="play-btn" title="Stop" disabled>■</button>
+            </div>
+            <div class="viewport-overlay" id="viewport-overlay">
+              <div class="hint">RMB drag = look · WASD fly · F focus · W/E/R gizmo · Ctrl+Z undo</div>
+            </div>
+          </main>
+          <div class="bottom-panel" id="bottom-panel">
+            <div class="panel-tabs bottom-tabs">
+              <button class="panel-tab active" data-bottom-tab="console">Console</button>
+              <button class="panel-tab" data-bottom-tab="assets">Assets</button>
+              <div class="bottom-tab-spacer"></div>
+              <button class="bottom-tab-action" id="console-clear" title="Clear console">Clear</button>
+              <button class="bottom-tab-collapse" id="bottom-collapse" title="Collapse">⌄</button>
+            </div>
+            <div class="bottom-content" id="console-body"></div>
+            <div class="bottom-content" id="assets-body" hidden>
+              <div class="empty">Asset library coming next.</div>
+            </div>
+          </div>
+        </section>
+        <aside class="panel-right" id="panel-inspector">
+          <div class="panel-header"><span>Inspector</span></div>
+          <div class="panel-content" id="inspector-body">
+            <div class="empty">Click anything in the viewport.</div>
+          </div>
+        </aside>
+      </div>
+      <!-- Floating dropdown chats — anchored to header buttons -->
+      <div class="float-panel" id="float-claude" hidden>
+        <div class="float-panel-head">
+          <span>💬 Claude</span>
+          <button class="float-panel-close" data-close="claude" title="Close">×</button>
+        </div>
+        <div class="float-panel-body" id="claude-body"></div>
+      </div>
+      <div class="float-panel" id="float-blender" hidden>
+        <div class="float-panel-head">
+          <span>🤖 Blender</span>
+          <button class="float-panel-close" data-close="blender" title="Close">×</button>
+        </div>
+        <div class="float-panel-body blender-panel" id="blender-body"></div>
+      </div>
+
+      <footer class="app-footer" id="app-footer">
+        <span id="footer-fps">0 fps</span>
+        <span class="footer-sep">·</span>
+        <span id="footer-sel">no selection</span>
+        <span class="footer-spacer"></span>
+        <span id="footer-version">HairyEngine v0.0.1</span>
+      </footer>
+    </div>
+    <script type="module" src="./main.ts"></script>
+  </body>
+</html>

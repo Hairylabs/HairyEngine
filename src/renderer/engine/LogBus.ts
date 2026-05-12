@@ -1,0 +1,88 @@
+// Intercepts console.log/info/warn/error and broadcasts entries to subscribers.
+// Original console methods still fire (we don't swallow DevTools output).
+//
+// Capped at MAX_ENTRIES rolling buffer so a noisy log loop doesn't OOM the panel.
+
+export type LogLevel = 'log' | 'info' | 'warn' | 'error';
+
+export type LogEntry = {
+  level: LogLevel;
+  timestamp: number;
+  message: string;
+};
+
+export type LogListener = (entry: LogEntry) => void;
+
+const MAX_ENTRIES = 2000;
+
+let installed = false;
+const buffer: LogEntry[] = [];
+const listeners: LogListener[] = [];
+
+export function installLogBus() {
+  if (installed) return;
+  installed = true;
+  (['log', 'info', 'warn', 'error'] as const).forEach((level) => {
+    const original = console[level].bind(console);
+    console[level] = (...args: unknown[]) => {
+      original(...args);
+      const entry: LogEntry = {
+        level,
+        timestamp: Date.now(),
+        message: args.map(formatArg).join(' '),
+      };
+      buffer.push(entry);
+      if (buffer.length > MAX_ENTRIES) buffer.shift();
+      listeners.forEach((l) => l(entry));
+    };
+  });
+
+  // Also surface uncaught errors and unhandled rejections — they currently
+  // only appear in DevTools, which players don't have open.
+  window.addEventListener('error', (e) => {
+    pushSynthetic('error', `Uncaught: ${e.message} (${e.filename}:${e.lineno})`);
+  });
+  window.addEventListener('unhandledrejection', (e) => {
+    pushSynthetic('error', `Unhandled rejection: ${formatArg(e.reason)}`);
+  });
+}
+
+export function getLogBuffer(): readonly LogEntry[] {
+  return buffer;
+}
+
+export function onLog(l: LogListener): () => void {
+  listeners.push(l);
+  return () => {
+    const i = listeners.indexOf(l);
+    if (i >= 0) listeners.splice(i, 1);
+  };
+}
+
+export function clearLogs() {
+  buffer.length = 0;
+  // Push a synthetic clear so consumers can wipe their views.
+  listeners.forEach((l) =>
+    l({ level: 'info', timestamp: Date.now(), message: '__clear__' }),
+  );
+}
+
+function pushSynthetic(level: LogLevel, message: string) {
+  const entry: LogEntry = { level, timestamp: Date.now(), message };
+  buffer.push(entry);
+  if (buffer.length > MAX_ENTRIES) buffer.shift();
+  listeners.forEach((l) => l(entry));
+}
+
+function formatArg(a: unknown): string {
+  if (a === null) return 'null';
+  if (a === undefined) return 'undefined';
+  if (typeof a === 'string') return a;
+  if (typeof a === 'number' || typeof a === 'boolean') return String(a);
+  if (a instanceof Error) return `${a.name}: ${a.message}\n${a.stack ?? ''}`;
+  try {
+    return JSON.stringify(a);
+  } catch {
+    return String(a);
+  }
+}

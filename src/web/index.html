@@ -1,0 +1,35 @@
+<!doctype html>
+<html lang="en">
+  <head>
+    <meta charset="UTF-8" />
+    <title>HairyEngine — Web Runtime</title>
+    <meta name="viewport" content="width=device-width, initial-scale=1" />
+    <style>
+      html, body { margin: 0; padding: 0; width: 100%; height: 100%; background: #1c2233; overflow: hidden; }
+      #canvas-3d { display: block; width: 100%; height: 100%; }
+      #hud-layer { position: absolute; inset: 0; pointer-events: none; color: #fff; font-family: system-ui, sans-serif; }
+      #loading {
+        position: absolute; inset: 0;
+        display: flex; align-items: center; justify-content: center;
+        color: #ddd; font-family: system-ui, sans-serif;
+        background: #14141d;
+      }
+      .hud-crosshair {
+        position: absolute; left: 50%; top: 50%;
+        width: 18px; height: 18px; transform: translate(-50%, -50%);
+      }
+      .hud-crosshair::before, .hud-crosshair::after {
+        content: ''; position: absolute; background: rgba(255,255,255,0.9);
+        box-shadow: 0 0 4px rgba(0,0,0,0.7);
+      }
+      .hud-crosshair::before { left: 50%; top: 0; bottom: 0; width: 2px; margin-left: -1px; }
+      .hud-crosshair::after { top: 50%; left: 0; right: 0; height: 2px; margin-top: -1px; }
+    </style>
+  </head>
+  <body>
+    <canvas id="canvas-3d"></canvas>
+    <div id="hud-layer"></div>
+    <div id="loading">Loading…</div>
+    <script type="module" src="./main.ts"></script>
+  </body>
+</html>

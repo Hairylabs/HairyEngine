@@ -1,0 +1,17 @@
+node_modules/
+out/
+dist/
+dist-web/
+*.log
+.DS_Store
+Thumbs.db
+.vscode/
+.idea/
+
+# electron-builder cache + electron-updater dev manifest
+dev-app-update.yml
+
+# Build artifacts that should never leak
+*.pem
+*.key
+*.pfx
