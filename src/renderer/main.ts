@@ -287,17 +287,24 @@ function toggleFloat(panel: HTMLElement, btn: HTMLButtonElement) {
 }
 claudeBtn.addEventListener('click', () => toggleFloat(floatClaude, claudeBtn));
 blenderBtn.addEventListener('click', () => toggleFloat(floatBlender, blenderBtn));
-document.querySelectorAll<HTMLButtonElement>('.float-panel-close').forEach((b) => {
-  b.addEventListener('click', () => {
-    const which = b.dataset.close;
-    if (which === 'claude') {
-      floatClaude.hidden = true;
-      claudeBtn.classList.remove('active');
-    } else if (which === 'blender') {
-      floatBlender.hidden = true;
-      blenderBtn.classList.remove('active');
-    }
-  });
+function closeFloat(which: 'claude' | 'blender') {
+  if (which === 'claude') {
+    floatClaude.hidden = true;
+    claudeBtn.classList.remove('active');
+  } else {
+    floatBlender.hidden = true;
+    blenderBtn.classList.remove('active');
+  }
+}
+document.getElementById('float-claude-close')?.addEventListener('click', (e) => {
+  e.preventDefault();
+  e.stopPropagation();
+  closeFloat('claude');
+});
+document.getElementById('float-blender-close')?.addEventListener('click', (e) => {
+  e.preventDefault();
+  e.stopPropagation();
+  closeFloat('blender');
 });
 // Escape closes any open floating panel.
 window.addEventListener('keydown', (e) => {

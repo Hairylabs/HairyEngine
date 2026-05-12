@@ -4,6 +4,13 @@ Chronological log of meaningful changes. Reverse-chronological order at the top.
 
 ---
 
+## 2026-05-12 — v0.0.3 released, auto-update live
+
+- First release published to GitHub Releases (Hairylabs/HairyEngine). NSIS installer + portable .exe at <https://github.com/Hairylabs/HairyEngine/releases/tag/v0.0.3>.
+- `app-update.yml` shipped inside the .exe has the fine-grained PAT embedded so installed clients can pull future versions automatically from the private repo.
+- Repo seeded — initial commit `e62d87a` pushed to `master`.
+- Bug fix: ❌ close buttons on the floating Claude / Blender chat panels weren't firing. Replaced the querySelectorAll wiring with explicit IDs and `e.stopPropagation()` to be defensive against any propagation interactions.
+
 ## 2026-05-12 — Strategic pivot to artist-first
 
 **Goal locked**: a dyslexic artist with no coding background can build and ship a multiplayer web paintball game from scratch. UX is measured against that bar from now on.
