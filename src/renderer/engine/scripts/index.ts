@@ -12,3 +12,5 @@ import './ParticleEmitter';
 import './MainCamera';
 import './FollowCamera';
 import './AttachToBone';
+import './AudioListener';
+import './AudioSource';

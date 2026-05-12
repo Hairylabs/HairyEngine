@@ -153,6 +153,10 @@ declare global {
         >;
         reveal: (path: string) => Promise<void>;
         openLibrary: () => Promise<void>;
+        writeBinary: (
+          filename: string,
+          bytes: ArrayBuffer,
+        ) => Promise<{ ok: true; path: string } | { ok: false; error: string }>;
       };
     };
   }

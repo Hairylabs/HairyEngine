@@ -34,6 +34,7 @@ export class AssetPanel {
     root.innerHTML = `
       <div class="asset-toolbar">
         <button class="asset-btn primary" id="asset-import">+ Import…</button>
+        <button class="asset-btn" id="asset-kenney">⬇ Install Kenney FPS pack</button>
         <button class="asset-btn" id="asset-refresh">Refresh</button>
         <button class="asset-btn" id="asset-open-folder">Open folder</button>
         <span class="asset-toolbar-info" id="asset-info"></span>
@@ -44,6 +45,7 @@ export class AssetPanel {
     this.listEl = root.querySelector('#asset-list') as HTMLElement;
 
     root.querySelector('#asset-import')?.addEventListener('click', () => this.importAsset());
+    root.querySelector('#asset-kenney')?.addEventListener('click', () => this.installKenneyPack());
     root.querySelector('#asset-refresh')?.addEventListener('click', () => this.refresh());
     root.querySelector('#asset-open-folder')?.addEventListener('click', () => {
       window.hairy.assets.openLibrary();
@@ -59,6 +61,49 @@ export class AssetPanel {
     } catch (err) {
       this.onMessage(`Asset list failed: ${(err as Error).message}`);
     }
+  }
+
+  // One-click pull of a curated set of Kenney's CC0 FPS Starter Kit assets.
+  // We hit jsDelivr's GitHub mirror so there are no API rate limits, and
+  // every file is licensed CC0 1.0 so there's no attribution string to ship.
+  private async installKenneyPack() {
+    const base =
+      'https://cdn.jsdelivr.net/gh/KenneyNL/Starter-Kit-FPS@main/models/';
+    const files = [
+      'crate.glb',
+      'barrel.glb',
+      'wall.glb',
+      'floor.glb',
+      'ramp.glb',
+      'stairs.glb',
+      'door.glb',
+      'window.glb',
+      'pillar.glb',
+      'cover-low.glb',
+      'cover-high.glb',
+    ];
+    this.onMessage(`Downloading ${files.length} Kenney assets…`);
+    let imported = 0;
+    let failed = 0;
+    for (const name of files) {
+      try {
+        const res = await fetch(base + name);
+        if (!res.ok) {
+          failed++;
+          continue;
+        }
+        const bytes = await res.arrayBuffer();
+        const r = await window.hairy.assets.writeBinary(`kenney_${name}`, bytes);
+        if (r.ok) imported++;
+        else failed++;
+      } catch {
+        failed++;
+      }
+    }
+    this.onMessage(
+      `Kenney pack: imported ${imported}, ${failed} failed (404s skipped). Library refreshed.`,
+    );
+    await this.refresh();
   }
 
   private async importAsset() {

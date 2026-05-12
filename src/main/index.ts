@@ -8,7 +8,14 @@ import { readFile, writeFile } from 'node:fs/promises';
 import { basename, join } from 'node:path';
 import { blenderConnection, BlenderResponse } from './blender';
 import { registerUpdater } from './updater';
-import { importAsset, listAssets, openLibrary, readAsset, revealAsset } from './assets';
+import {
+  importAsset,
+  listAssets,
+  openLibrary,
+  readAsset,
+  revealAsset,
+  writeAssetBinary,
+} from './assets';
 import { randomUUID } from 'node:crypto';
 import {
   broadcastToAll,
@@ -199,6 +206,10 @@ function registerIpc() {
   ipcMain.handle('assets:import', () => importAsset(mainWindow));
   ipcMain.handle('assets:reveal', (_e, path: string) => revealAsset(path));
   ipcMain.handle('assets:openLibrary', () => openLibrary());
+  ipcMain.handle(
+    'assets:writeBinary',
+    (_e, filename: string, bytes: ArrayBuffer) => writeAssetBinary(filename, bytes),
+  );
 
   // ai:hasKey kept so older renderer code doesn't crash; always reports `true`
   // because we now use the Claude Code CLI subscription via the Agent SDK and

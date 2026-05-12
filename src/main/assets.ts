@@ -71,6 +71,25 @@ export async function readAsset(
   }
 }
 
+// Write a binary blob (bytes) into the asset library under the given filename.
+// Used by the in-app Kenney importer + future asset-download buttons.
+export async function writeAssetBinary(
+  filename: string,
+  bytes: ArrayBuffer,
+): Promise<{ ok: true; path: string } | { ok: false; error: string }> {
+  try {
+    const dir = await ensureLibrary();
+    // Sanitize: strip directory traversal, allow only common chars.
+    const safe = filename.replace(/[^A-Za-z0-9._-]/g, '_').slice(0, 80) || 'asset.glb';
+    const dest = join(dir, safe);
+    const { writeFile } = await import('node:fs/promises');
+    await writeFile(dest, Buffer.from(bytes));
+    return { ok: true, path: dest };
+  } catch (err) {
+    return { ok: false, error: (err as Error).message };
+  }
+}
+
 export async function importAsset(
   win: BrowserWindow | null,
 ): Promise<

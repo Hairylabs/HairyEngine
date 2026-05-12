@@ -58,7 +58,7 @@ export type UpdaterEvent =
   | { type: 'error'; message: string };
 
 const api = {
-  version: '0.0.10',
+  version: '0.0.11',
   blender: {
     connect: (host?: string, port?: number): Promise<ConnectResult> =>
       ipcRenderer.invoke('blender:connect', host, port),
@@ -173,6 +173,11 @@ const api = {
     > => ipcRenderer.invoke('assets:import'),
     reveal: (path: string): Promise<void> => ipcRenderer.invoke('assets:reveal', path),
     openLibrary: (): Promise<void> => ipcRenderer.invoke('assets:openLibrary'),
+    writeBinary: (
+      filename: string,
+      bytes: ArrayBuffer,
+    ): Promise<{ ok: true; path: string } | { ok: false; error: string }> =>
+      ipcRenderer.invoke('assets:writeBinary', filename, bytes),
   },
 };
 
