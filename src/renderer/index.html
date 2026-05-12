@@ -47,6 +47,16 @@
               <button id="pause-btn" class="play-btn" title="Pause" disabled>❚❚</button>
               <button id="stop-btn" class="play-btn" title="Stop" disabled>■</button>
             </div>
+            <div class="selection-toolbar" id="selection-toolbar" hidden>
+              <span class="selection-label" id="selection-label"></span>
+              <button id="sel-duplicate" class="sel-btn" title="Duplicate (Ctrl+D)">⧉ Duplicate</button>
+              <button id="sel-delete" class="sel-btn" title="Delete (Del)">🗑 Delete</button>
+              <button id="sel-focus" class="sel-btn" title="Frame in view (F)">⊙ Focus</button>
+              <button id="sel-reset-rot" class="sel-btn" title="Reset rotation to 0,0,0">⤺ Reset Rot</button>
+              <button id="sel-reset-scale" class="sel-btn" title="Reset scale to 1,1,1">▣ Reset Scale</button>
+              <button id="sel-drop" class="sel-btn" title="Drop to floor">⤓ Drop</button>
+              <button id="sel-snap" class="sel-btn" title="Snap to grid (Shift+G)">⊞ Snap</button>
+            </div>
             <div class="viewport-overlay" id="viewport-overlay">
               <div class="hint">RMB drag = look · WASD fly · F focus · W/E/R gizmo · Ctrl+Z undo</div>
             </div>

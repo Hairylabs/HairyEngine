@@ -319,6 +319,69 @@ subtractBtn.addEventListener('click', () => {
   status.setStatus(`Subtract: now click the WALL to cut "${pendingCutter.name}" out of`);
 });
 
+// --- Selection toolbar (context-sensitive, shows on selection) -----------
+const selToolbar = document.getElementById('selection-toolbar') as HTMLElement;
+const selLabel = document.getElementById('selection-label') as HTMLElement;
+function updateSelToolbar(obj: THREE.Object3D | null) {
+  if (!obj) {
+    selToolbar.hidden = true;
+    return;
+  }
+  selToolbar.hidden = false;
+  selLabel.textContent = obj.name || obj.type;
+}
+scene.onSelectionChanged((obj) => updateSelToolbar(obj));
+
+document.getElementById('sel-duplicate')?.addEventListener('click', () => {
+  try {
+    const sel = scene.selection;
+    if (!sel) return;
+    const copy = sel.clone(true);
+    copy.position.copy(sel.position).add(new THREE.Vector3(1, 0, 0));
+    copy.name = `${sel.name}_copy`;
+    history.push(new AddObjectCommand(scene, copy));
+    status.setStatus(`Duplicated "${sel.name}"`);
+  } catch (err) {
+    console.error('[sel-duplicate]', err);
+  }
+});
+document.getElementById('sel-delete')?.addEventListener('click', () => {
+  const sel = scene.selection;
+  if (!sel) return;
+  if (sel.userData.deletable === false) {
+    status.setStatus('This object is protected from delete');
+    return;
+  }
+  history.push(new RemoveObjectCommand(scene, sel));
+});
+document.getElementById('sel-focus')?.addEventListener('click', () => viewport.focusSelected());
+document.getElementById('sel-reset-rot')?.addEventListener('click', () => {
+  const sel = scene.selection;
+  if (!sel) return;
+  sel.rotation.set(0, 0, 0);
+  scene.notifyChanged();
+});
+document.getElementById('sel-reset-scale')?.addEventListener('click', () => {
+  const sel = scene.selection;
+  if (!sel) return;
+  sel.scale.set(1, 1, 1);
+  scene.notifyChanged();
+});
+document.getElementById('sel-drop')?.addEventListener('click', () => {
+  try {
+    dropToFloor(scene, history);
+  } catch (err) {
+    console.error('[sel-drop]', err);
+  }
+});
+document.getElementById('sel-snap')?.addEventListener('click', () => {
+  try {
+    snapToGrid(scene, history);
+  } catch (err) {
+    console.error('[sel-snap]', err);
+  }
+});
+
 // Drop-to-floor (Unreal "End" key)
 document.getElementById('drop-floor-btn')?.addEventListener('click', () => {
   try {

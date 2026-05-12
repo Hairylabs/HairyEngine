@@ -46,10 +46,18 @@ export function installLogBus() {
   });
 
   window.addEventListener('error', (e) => {
-    pushSynthetic('error', `Uncaught: ${e.message} (${e.filename}:${e.lineno})`);
+    // e.error has the full Error object with stack. Without it the bundle
+    // line numbers are useless — we'd never find the bug.
+    const stack = e.error?.stack ? `\n${e.error.stack}` : '';
+    pushSynthetic(
+      'error',
+      `Uncaught: ${e.message} (${e.filename}:${e.lineno}:${e.colno})${stack}`,
+    );
   });
   window.addEventListener('unhandledrejection', (e) => {
-    pushSynthetic('error', `Unhandled rejection: ${formatArg(e.reason)}`);
+    const reason = e.reason;
+    const stack = reason instanceof Error && reason.stack ? `\n${reason.stack}` : '';
+    pushSynthetic('error', `Unhandled rejection: ${formatArg(reason)}${stack}`);
   });
 }
 
