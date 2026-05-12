@@ -569,6 +569,62 @@ document.getElementById('sel-extrude-x')?.addEventListener('click', () => doExtr
 document.getElementById('sel-extrude-y')?.addEventListener('click', () => doExtrude('y'));
 document.getElementById('sel-extrude-z')?.addEventListener('click', () => doExtrude('z'));
 
+// Chamfer / bevel — replaces the selected mesh's BoxGeometry (or already-
+// chamfered RoundedBoxGeometry) with a RoundedBoxGeometry of larger radius.
+// Each click adds +5cm bevel, reset returns to sharp box. We stash the
+// "logical" size on userData so repeated chamfers don't lose accuracy
+// (RoundedBoxGeometry's parameters object doesn't survive shrink/grow well).
+async function doChamfer(delta: number) {
+  const sel = scene.selection;
+  if (!sel || !(sel as THREE.Mesh).isMesh) {
+    status.setStatus('Select a Box mesh first');
+    return;
+  }
+  const mesh = sel as THREE.Mesh;
+  const { RoundedBoxGeometry } = await import(
+    'three/addons/geometries/RoundedBoxGeometry.js'
+  );
+  const geom = mesh.geometry as THREE.BoxGeometry & {
+    parameters?: { width?: number; height?: number; depth?: number };
+    type?: string;
+  };
+  // Recover (width, height, depth) and current chamfer radius.
+  const cached = mesh.userData.__chamferDims as
+    | { w: number; h: number; d: number }
+    | undefined;
+  const dims = cached ?? {
+    w: geom.parameters?.width ?? 1,
+    h: geom.parameters?.height ?? 1,
+    d: geom.parameters?.depth ?? 1,
+  };
+  const currentRadius = Number(mesh.userData.__chamferRadius ?? 0);
+  const nextRadius = delta < 0 ? 0 : Math.min(
+    Math.min(dims.w, dims.h, dims.d) * 0.49,
+    currentRadius + delta,
+  );
+  mesh.geometry.dispose();
+  if (nextRadius <= 0.001) {
+    mesh.geometry = new THREE.BoxGeometry(dims.w, dims.h, dims.d);
+    delete mesh.userData.__chamferRadius;
+  } else {
+    mesh.geometry = new RoundedBoxGeometry(
+      dims.w,
+      dims.h,
+      dims.d,
+      4, // segments per edge
+      nextRadius,
+    );
+    mesh.userData.__chamferRadius = nextRadius;
+  }
+  mesh.userData.__chamferDims = dims;
+  scene.notifyChanged();
+  status.setStatus(
+    nextRadius > 0 ? `Chamfer ${(nextRadius * 100).toFixed(0)}cm` : 'Sharp edges',
+  );
+}
+document.getElementById('sel-chamfer-add')?.addEventListener('click', () => doChamfer(0.05));
+document.getElementById('sel-chamfer-reset')?.addEventListener('click', () => doChamfer(-1));
+
 // Drop-to-floor (Unreal "End" key)
 document.getElementById('drop-floor-btn')?.addEventListener('click', () => {
   try {

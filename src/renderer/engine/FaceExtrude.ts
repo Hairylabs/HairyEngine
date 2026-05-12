@@ -377,38 +377,69 @@ export class FaceExtrude {
 
   private applyExtrude(distance: number) {
     if (!this.dragMesh || !this.dragFace || !this.dragSnapshot) return;
-    const next = {
-      w: this.dragSnapshot.width,
-      h: this.dragSnapshot.height,
-      d: this.dragSnapshot.depth,
-      pos: this.dragSnapshot.position.clone(),
-    };
-    const half = distance * 0.5;
+    // Pull-through behavior: the OPPOSITE face stays fixed at its original
+    // world position; the dragged face moves by `distance`. If the dragged
+    // face crosses past the opposite face we keep growing on that side
+    // rather than clamping to zero (Blender-style "negative extrude").
+    const snap = this.dragSnapshot;
+    let axisMin: number, axisMax: number;
+    let next = { w: snap.width, h: snap.height, d: snap.depth, pos: snap.position.clone() };
+
     switch (this.dragFace) {
-      case '+x':
-        next.w = Math.max(0.01, this.dragSnapshot.width + distance);
-        next.pos.x += half;
+      case '+x': {
+        const opp = snap.position.x - snap.width * 0.5; // stays fixed
+        const moved = snap.position.x + snap.width * 0.5 + distance;
+        axisMin = Math.min(opp, moved);
+        axisMax = Math.max(opp, moved);
+        next.w = Math.max(0.01, axisMax - axisMin);
+        next.pos.x = (axisMin + axisMax) * 0.5;
         break;
-      case '-x':
-        next.w = Math.max(0.01, this.dragSnapshot.width + distance);
-        next.pos.x -= half;
+      }
+      case '-x': {
+        const opp = snap.position.x + snap.width * 0.5;
+        const moved = snap.position.x - snap.width * 0.5 - distance;
+        axisMin = Math.min(opp, moved);
+        axisMax = Math.max(opp, moved);
+        next.w = Math.max(0.01, axisMax - axisMin);
+        next.pos.x = (axisMin + axisMax) * 0.5;
         break;
-      case '+y':
-        next.h = Math.max(0.01, this.dragSnapshot.height + distance);
-        next.pos.y += half;
+      }
+      case '+y': {
+        const opp = snap.position.y - snap.height * 0.5;
+        const moved = snap.position.y + snap.height * 0.5 + distance;
+        axisMin = Math.min(opp, moved);
+        axisMax = Math.max(opp, moved);
+        next.h = Math.max(0.01, axisMax - axisMin);
+        next.pos.y = (axisMin + axisMax) * 0.5;
         break;
-      case '-y':
-        next.h = Math.max(0.01, this.dragSnapshot.height + distance);
-        next.pos.y -= half;
+      }
+      case '-y': {
+        const opp = snap.position.y + snap.height * 0.5;
+        const moved = snap.position.y - snap.height * 0.5 - distance;
+        axisMin = Math.min(opp, moved);
+        axisMax = Math.max(opp, moved);
+        next.h = Math.max(0.01, axisMax - axisMin);
+        next.pos.y = (axisMin + axisMax) * 0.5;
         break;
-      case '+z':
-        next.d = Math.max(0.01, this.dragSnapshot.depth + distance);
-        next.pos.z += half;
+      }
+      case '+z': {
+        const opp = snap.position.z - snap.depth * 0.5;
+        const moved = snap.position.z + snap.depth * 0.5 + distance;
+        axisMin = Math.min(opp, moved);
+        axisMax = Math.max(opp, moved);
+        next.d = Math.max(0.01, axisMax - axisMin);
+        next.pos.z = (axisMin + axisMax) * 0.5;
         break;
-      case '-z':
-        next.d = Math.max(0.01, this.dragSnapshot.depth + distance);
-        next.pos.z -= half;
+      }
+      case '-z': {
+        const opp = snap.position.z + snap.depth * 0.5;
+        const moved = snap.position.z - snap.depth * 0.5 - distance;
+        axisMin = Math.min(opp, moved);
+        axisMax = Math.max(opp, moved);
+        next.d = Math.max(0.01, axisMax - axisMin);
+        next.pos.z = (axisMin + axisMax) * 0.5;
         break;
+      }
     }
     this.dragMesh.geometry.dispose();
     this.dragMesh.geometry = new THREE.BoxGeometry(next.w, next.h, next.d);
