@@ -45,6 +45,9 @@ export class Viewport {
   // Active camera each frame — usually the editor camera, but Play Mode can
   // swap to a scene camera marked as `isMainCamera`.
   private activeCamera: THREE.PerspectiveCamera;
+  // When false, click-to-select on the viewport is suppressed (used while
+  // sub-object editing tools like face-extrude own the click).
+  private pickingEnabled = true;
 
   constructor(
     private canvas: HTMLCanvasElement,
@@ -160,6 +163,10 @@ export class Viewport {
     this.outline.selectedObjects = obj ? [obj] : [];
   }
 
+  setPickingEnabled(on: boolean) {
+    this.pickingEnabled = on;
+  }
+
   private findMainCamera(): THREE.PerspectiveCamera {
     // First scene camera with userData.isMainCamera === true wins. Otherwise
     // fall back to the editor camera so the user sees something rather than
@@ -237,6 +244,7 @@ export class Viewport {
     });
     this.canvas.addEventListener('pointerup', (e) => {
       if (e.button !== 0) return;
+      if (!this.pickingEnabled) return;
       const dx = e.clientX - this.downAt.x;
       const dy = e.clientY - this.downAt.y;
       const dt = performance.now() - this.downAt.t;

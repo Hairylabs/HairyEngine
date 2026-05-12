@@ -131,7 +131,12 @@ new DropZone(viewportEl, scene, project, history, (msg) => status.setStatus(msg)
 const updateToast = new UpdateToast(document.body);
 const ponksDrawer = new PonksDrawer(document.body, scene, (m) => status.setStatus(m));
 const multiplayer = new Multiplayer(scene, play);
+// Declared up-front so the scene selection listener below can poll its
+// isActive() without forward-ref ordering issues.
+// eslint-disable-next-line prefer-const
+var faceExtrudeRef: { isActive: () => boolean } | null = null;
 const faceExtrude = new FaceExtrude(canvas, viewport.camera, scene, history);
+faceExtrudeRef = faceExtrude;
 
 // Face mode button (toolbar). Toggle on/off; mutually exclusive with the
 // normal translate/rotate/scale gizmo (we just disable picking when active).
@@ -147,9 +152,10 @@ faceModeBtn.addEventListener('click', () => {
 });
 faceExtrude.onChange((on) => {
   faceModeBtn.classList.toggle('active', on);
-  // While in face mode, hide the transform gizmo so it doesn't intercept
-  // clicks on the cube faces. Re-attach when we leave face mode if there
-  // was a previous selection.
+  // Block both: the transform gizmo (don't show arrows on a selected mesh
+  // while in face mode) AND the viewport's auto-pick on click (which would
+  // re-attach the gizmo behind our backs the moment you click a cube's face).
+  viewport.setPickingEnabled(!on);
   if (on) {
     viewport.setSelected(null);
   } else if (scene.selection) {
@@ -157,38 +163,65 @@ faceExtrude.onChange((on) => {
   }
 });
 
-// Wireframe / mesh mode — toggle wireframe rendering on every mesh in the
-// editable subtree. Useful for seeing triangle topology / verifying that
-// blockout primitives line up.
+// Wireframe / mesh mode — overlay clean edge lines on every mesh. We use
+// THREE.EdgesGeometry (angle-threshold filter) so a quad's diagonal triangle
+// split doesn't clutter the view. Each overlay is a child LineSegments
+// tagged with userData.isWireframeOverlay so we can find + remove them all.
 let wireframeOn = false;
+const WIREFRAME_TAG = '__wireframeOverlay';
 const wireframeBtn = document.getElementById('wireframe-btn') as HTMLButtonElement;
+
+function addWireframeOverlay(mesh: THREE.Mesh) {
+  // Skip if already wrapped.
+  if (mesh.children.some((c) => c.userData[WIREFRAME_TAG])) return;
+  const edges = new THREE.EdgesGeometry(mesh.geometry, 25);
+  const lines = new THREE.LineSegments(
+    edges,
+    new THREE.LineBasicMaterial({ color: 0x4cf8c5 }),
+  );
+  lines.userData[WIREFRAME_TAG] = true;
+  lines.userData.deletable = false;
+  lines.renderOrder = 998;
+  mesh.add(lines);
+}
+
+function removeWireframeOverlays(obj: THREE.Object3D) {
+  obj.traverse((o) => {
+    const toRemove: THREE.Object3D[] = [];
+    for (const c of o.children) {
+      if (c.userData[WIREFRAME_TAG]) toRemove.push(c);
+    }
+    for (const c of toRemove) {
+      o.remove(c);
+      (c as THREE.LineSegments).geometry.dispose();
+      ((c as THREE.LineSegments).material as THREE.Material).dispose();
+    }
+  });
+}
+
+function applyWireframe(on: boolean) {
+  if (!on) {
+    removeWireframeOverlays(scene.editable);
+    return;
+  }
+  scene.editable.traverse((o) => {
+    const m = o as THREE.Mesh;
+    if (m.isMesh) addWireframeOverlay(m);
+  });
+}
+
 wireframeBtn.addEventListener('click', () => {
   wireframeOn = !wireframeOn;
   wireframeBtn.classList.toggle('active', wireframeOn);
-  scene.editable.traverse((o) => {
-    const m = o as THREE.Mesh;
-    if (m.isMesh && m.material) {
-      if (Array.isArray(m.material)) {
-        m.material.forEach((mat) => {
-          (mat as THREE.MeshStandardMaterial).wireframe = wireframeOn;
-        });
-      } else {
-        (m.material as THREE.MeshStandardMaterial).wireframe = wireframeOn;
-      }
-    }
-  });
-  status.setStatus(wireframeOn ? 'Wireframe ON' : 'Wireframe OFF');
+  applyWireframe(wireframeOn);
+  status.setStatus(wireframeOn ? 'Wireframe ON (edges only)' : 'Wireframe OFF');
 });
-// Re-apply wireframe state to new objects when scene changes (e.g. add a cube
-// while wireframe is on — it should also be wireframe).
+// Re-apply when scene changes so newly-added meshes inherit the state and
+// re-extruded meshes get fresh overlays at the new geometry.
 scene.onSceneChanged(() => {
   if (!wireframeOn) return;
-  scene.editable.traverse((o) => {
-    const m = o as THREE.Mesh;
-    if (m.isMesh && m.material && !Array.isArray(m.material)) {
-      (m.material as THREE.MeshStandardMaterial).wireframe = true;
-    }
-  });
+  removeWireframeOverlays(scene.editable);
+  applyWireframe(true);
 });
 // F key toggles face mode for power users.
 window.addEventListener('keydown', (e) => {
@@ -349,7 +382,12 @@ walletBtn.addEventListener('click', async () => {
 console.info(`HairyEngine v${window.hairy.version} ready.`);
 
 scene.onSelectionChanged((obj) => {
-  viewport.setSelected(obj);
+  // While face mode is active, ignore selection changes — face-extrude
+  // owns the click, and re-attaching the gizmo on every cube click would
+  // fight the face widget for events.
+  if (!faceExtrudeRef?.isActive()) {
+    viewport.setSelected(obj);
+  }
   inspector.show(obj);
   status.setSelection(obj);
 });
@@ -423,19 +461,33 @@ scene.onGridSizeChanged((size) => {
 // Initial label
 gridSizeBtn.textContent = formatGridSize(scene.getGridSize());
 
-// Boolean subtract — first click marks the selection as "cutter", second
-// click on a target mesh runs the cut. Esc to cancel.
-let pendingCutter: THREE.Mesh | null = null;
+// Boolean tools — Subtract / Merge work the same way: first click marks the
+// selection as "operand A", second click on a target mesh runs the op.
+type PendingOp = { mesh: THREE.Mesh; kind: 'subtract' | 'union' };
+let pendingOp: PendingOp | null = null;
 const subtractBtn = document.getElementById('subtract-btn') as HTMLButtonElement;
+const mergeBtn = document.getElementById('merge-btn') as HTMLButtonElement;
 subtractBtn.addEventListener('click', () => {
   const sel = scene.selection;
   if (!sel || !(sel as THREE.Mesh).isMesh) {
     status.setStatus('Select a mesh to use as the cutter first (the doorway shape)');
     return;
   }
-  pendingCutter = sel as THREE.Mesh;
+  pendingOp = { mesh: sel as THREE.Mesh, kind: 'subtract' };
   subtractBtn.classList.add('active');
-  status.setStatus(`Subtract: now click the WALL to cut "${pendingCutter.name}" out of`);
+  mergeBtn.classList.remove('active');
+  status.setStatus(`Subtract: now click the WALL to cut "${pendingOp.mesh.name}" out of`);
+});
+mergeBtn.addEventListener('click', () => {
+  const sel = scene.selection;
+  if (!sel || !(sel as THREE.Mesh).isMesh) {
+    status.setStatus('Select a mesh first, then click Merge, then click another mesh to fuse them.');
+    return;
+  }
+  pendingOp = { mesh: sel as THREE.Mesh, kind: 'union' };
+  mergeBtn.classList.add('active');
+  subtractBtn.classList.remove('active');
+  status.setStatus(`Merge: now click another mesh to fuse with "${pendingOp.mesh.name}"`);
 });
 
 // --- Selection toolbar (context-sensitive, shows on selection) -----------
@@ -580,26 +632,35 @@ multiplayer.onStateChange((connected, info) => {
 });
 
 scene.onSelectionChanged((obj) => {
-  if (!pendingCutter) return;
-  if (!obj || obj === pendingCutter) return;
+  if (!pendingOp) return;
+  if (!obj || obj === pendingOp.mesh) return;
   if (!(obj as THREE.Mesh).isMesh) {
-    status.setStatus('Subtract target must be a mesh — pick a wall or floor');
+    status.setStatus('Boolean target must be a mesh');
     return;
   }
   try {
-    const result = applyBoolean(obj as THREE.Mesh, pendingCutter, 'subtract');
+    const result = applyBoolean(
+      obj as THREE.Mesh,
+      pendingOp.mesh,
+      pendingOp.kind === 'subtract' ? 'subtract' : 'union',
+    );
     result.userData = { ...(obj as THREE.Mesh).userData };
     scene.addInternal(result);
     scene.removeInternal(obj);
-    scene.removeInternal(pendingCutter);
-    history.clear(); // mixing CSG output with the undo stack would be messy
+    scene.removeInternal(pendingOp.mesh);
+    history.clear(); // CSG output + undo stack would diverge; safest reset
     scene.select(result);
-    status.setStatus(`Cut "${pendingCutter.name}" out of "${obj.name}"`);
+    status.setStatus(
+      pendingOp.kind === 'subtract'
+        ? `Cut "${pendingOp.mesh.name}" out of "${obj.name}"`
+        : `Merged "${pendingOp.mesh.name}" with "${obj.name}"`,
+    );
   } catch (err) {
-    status.setStatus(`Subtract failed: ${(err as Error).message}`);
+    status.setStatus(`Boolean failed: ${(err as Error).message}`);
   }
-  pendingCutter = null;
+  pendingOp = null;
   subtractBtn.classList.remove('active');
+  mergeBtn.classList.remove('active');
 });
 
 viewport.start((dt, fps) => {
@@ -647,7 +708,54 @@ window.addEventListener('keydown', (e) => {
   }
   if (e.key === 'f') viewport.focusSelected();
   if (e.key === 'Escape') scene.select(null);
+
+  // Blender-style shortcuts (only when not typing in an input):
+  //   Ctrl+C — copy selected to clipboard
+  //   Ctrl+V — paste (clone + offset)
+  //   Ctrl+D — duplicate (paste alongside original immediately)
+  //   Shift+D — duplicate (Blender alias)
+  if ((e.ctrlKey || e.metaKey) && e.key.toLowerCase() === 'c') {
+    const sel = scene.selection;
+    if (sel) {
+      clipboard = sel;
+      status.setStatus(`Copied "${sel.name}"`);
+    }
+    return;
+  }
+  if ((e.ctrlKey || e.metaKey) && e.key.toLowerCase() === 'v') {
+    pasteClipboard();
+    return;
+  }
+  if (
+    (((e.ctrlKey || e.metaKey) && e.key.toLowerCase() === 'd') ||
+      (e.shiftKey && e.key.toLowerCase() === 'd')) &&
+    !isEditableTarget(e.target)
+  ) {
+    e.preventDefault();
+    const sel = scene.selection;
+    if (sel) {
+      clipboard = sel;
+      pasteClipboard();
+    }
+    return;
+  }
 });
+
+// Clipboard for copy/paste — stores a reference to the source object;
+// each paste does a deep `.clone(true)` so further edits to the clipboard
+// don't affect already-pasted copies.
+let clipboard: THREE.Object3D | null = null;
+function pasteClipboard() {
+  if (!clipboard) {
+    status.setStatus('Clipboard empty — Ctrl+C to copy first');
+    return;
+  }
+  const copy = clipboard.clone(true);
+  copy.position.copy(clipboard.position).add(new THREE.Vector3(1, 0, 0));
+  copy.name = `${clipboard.name}_copy`;
+  history.push(new AddObjectCommand(scene, copy));
+  status.setStatus(`Pasted "${clipboard.name}" → "${copy.name}"`);
+}
 
 function isEditableTarget(target: EventTarget | null): boolean {
   if (!(target instanceof HTMLElement)) return false;

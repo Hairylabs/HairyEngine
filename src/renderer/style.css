@@ -198,12 +198,14 @@ button:hover { background: #25253a; }
   background: rgba(0,0,0,0.25);
 }
 .panel-content {
-  flex: 1;
-  overflow-y: auto;
+  flex: 1 1 0;
+  overflow-y: auto !important;
   overflow-x: hidden;
   padding: 6px 4px;
   min-height: 0;
+  height: 100%;
 }
+#inspector-body { max-height: 100%; }
 /* Force a visible scrollbar so the inspector is obviously scrollable.
    Without this, Windows' auto-hide setting can leave users thinking
    the panel is non-scrollable when content overflows. */
