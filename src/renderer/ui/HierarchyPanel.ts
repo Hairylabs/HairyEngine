@@ -1,8 +1,10 @@
 import * as THREE from 'three';
 import { Scene } from '../engine/Scene';
+import { getActorKind, actorIcon, actorLabel } from '../engine/ActorTaxonomy';
 
-// Hierarchy panel — flat list of editable objects, click to select.
-// Will grow to support nested groups, drag-to-reparent, etc.
+// Hierarchy panel — flat list of editable Actors, click to select.
+// Uses HairyEngine actor taxonomy for icon + tooltip so the user sees
+// "Hero / Prop / Brush / Light" rather than Three.js class names.
 
 export class HierarchyPanel {
   constructor(
@@ -33,17 +35,12 @@ export class HierarchyPanel {
     const btn = document.createElement('button');
     btn.className = 'hierarchy-row';
     btn.dataset.uuid = obj.uuid;
-    btn.textContent = `${this.icon(obj)} ${obj.name || obj.type}`;
+    const kind = getActorKind(obj);
+    btn.textContent = `${actorIcon(kind)} ${obj.name || obj.type}`;
+    btn.title = `${actorLabel(kind)} · ${obj.type}`;
     if (this.scene.selection === obj) btn.classList.add('selected');
     btn.addEventListener('click', () => this.scene.select(obj));
     li.appendChild(btn);
     return li;
-  }
-
-  private icon(obj: THREE.Object3D): string {
-    if ((obj as THREE.Mesh).isMesh) return '◼';
-    if ((obj as THREE.Light).isLight) return '☀';
-    if ((obj as THREE.Group).isGroup) return '▤';
-    return '·';
   }
 }

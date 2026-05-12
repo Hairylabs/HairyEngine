@@ -14,6 +14,19 @@ export function openMenuPopup(anchor: HTMLElement, items: MenuItem[]) {
   popup.className = 'menu-popup';
   popup.style.left = `${rect.left}px`;
   popup.style.top = `${rect.bottom + 4}px`;
+  // After mount, clamp to viewport so long lists scroll inside the popup
+  // rather than disappearing off the bottom of the screen.
+  requestAnimationFrame(() => {
+    const pRect = popup.getBoundingClientRect();
+    const margin = 8;
+    if (pRect.bottom > window.innerHeight - margin) {
+      const newTop = Math.max(margin, window.innerHeight - margin - pRect.height);
+      popup.style.top = `${newTop}px`;
+    }
+    if (pRect.right > window.innerWidth - margin) {
+      popup.style.left = `${Math.max(margin, window.innerWidth - margin - pRect.width)}px`;
+    }
+  });
 
   for (const item of items) {
     if ('sep' in item) {

@@ -2,6 +2,7 @@ import * as THREE from 'three';
 import { Scene } from './Scene';
 import { History } from './History';
 import { AddObjectCommand } from './Commands';
+import { setActorKind } from './ActorTaxonomy';
 
 // Paintball game bootstrap — one-click commands that lay down the building
 // blocks for a multiplayer paintball arena using PulseChain Ponks NFTs as
@@ -58,6 +59,7 @@ export function makePaintGun(): THREE.Group {
   group.userData.__scripts = [
     { type: 'PaintShooter', params: { rate: 4, speed: 25 } },
   ];
+  setActorKind(group, 'prop');
   return group;
 }
 
@@ -88,6 +90,7 @@ export function makePaintPlayer(team: 'red' | 'blue' = 'red'): THREE.Group {
     { type: 'Crosshair', params: {} },
     { type: 'PaintShooter', params: { rate: 4, speed: 25 } },
   ];
+  setActorKind(group, 'hero');
   return group;
 }
 
@@ -208,5 +211,6 @@ function makeSpawnMarker(name: string, color: number, position: THREE.Vector3): 
   ring.rotation.x = Math.PI / 2;
   ring.userData.deletable = false;
   group.add(ring);
+  setActorKind(group, 'spawn');
   return group;
 }

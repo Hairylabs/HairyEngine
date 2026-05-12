@@ -28,6 +28,14 @@
           <div class="panel-content" id="hierarchy-tree"></div>
         </aside>
         <section class="center">
+          <div class="levels-bar" id="levels-bar">
+            <span class="levels-bar-label">Levels</span>
+            <div id="levels-chips" style="display: flex; gap: 4px; flex: 1; flex-wrap: wrap;"></div>
+            <button class="level-chip-action" id="levels-rename" title="Rename current level">✎</button>
+            <button class="level-chip-action" id="levels-duplicate" title="Duplicate current level">⧉</button>
+            <button class="level-chip-action" id="levels-delete" title="Delete current level">🗑</button>
+            <button class="level-chip-action" id="levels-help" title="What are Levels?">?</button>
+          </div>
           <main class="viewport">
             <canvas id="canvas-3d"></canvas>
             <div class="viewport-toolbar" id="viewport-toolbar">
@@ -48,6 +56,7 @@
               <button id="topdown-btn" class="gizmo-btn" title="Top-down split view (Hammer-style 2D viewport)">▤</button>
               <button id="modeling-btn" class="gizmo-btn" title="UE5-style modeling tools (Extrude Poly, Warp, Lattice, Edit Pivot)">⚙</button>
               <button id="paintball-btn" class="gizmo-btn" title="Build paintball arena (one-click playable map)">🎯</button>
+              <button id="mixamo-btn" class="gizmo-btn" title="Animation library — apply Mixamo clips to selected character">💃</button>
               <div class="toolbar-sep"></div>
               <button id="multiplayer-btn" class="gizmo-btn" title="Connect to multiplayer server (localhost:2567)">⚡</button>
               <div class="toolbar-sep"></div>

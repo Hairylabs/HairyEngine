@@ -996,8 +996,15 @@ button:hover { background: #25253a; }
   border-radius: 6px;
   padding: 4px;
   min-width: 160px;
+  max-height: 70vh;
+  overflow-y: auto;
+  overflow-x: hidden;
   box-shadow: 0 4px 16px rgba(0,0,0,0.5);
+  scrollbar-width: thin;
 }
+.menu-popup::-webkit-scrollbar { width: 8px; }
+.menu-popup::-webkit-scrollbar-thumb { background: var(--border); border-radius: 4px; }
+.menu-popup::-webkit-scrollbar-thumb:hover { background: var(--accent); }
 .menu-popup button {
   display: block;
   width: 100%;
@@ -1435,3 +1442,235 @@ button:hover { background: #25253a; }
   color: var(--muted);
   padding: 4px 12px 6px;
 }
+
+/* Crash modal — shown by CrashHelper when an uncaught error fires */
+.crash-backdrop {
+  position: fixed;
+  inset: 0;
+  background: rgba(0, 0, 0, 0.75);
+  z-index: 9999;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+}
+.crash-modal {
+  width: 720px;
+  max-width: 90vw;
+  max-height: 85vh;
+  background: #1a1f2a;
+  border: 2px solid rgba(255, 80, 80, 0.6);
+  border-radius: 8px;
+  display: flex;
+  flex-direction: column;
+  box-shadow: 0 8px 40px rgba(255, 80, 80, 0.25);
+  overflow: hidden;
+}
+.crash-head {
+  padding: 12px 18px;
+  font-size: 16px;
+  font-weight: 700;
+  color: #ff7878;
+  background: rgba(255, 80, 80, 0.12);
+  border-bottom: 1px solid var(--border);
+}
+.crash-body {
+  padding: 14px 18px;
+  overflow-y: auto;
+  flex: 1 1 0;
+  font-size: 12px;
+  color: var(--text);
+}
+.crash-summary {
+  font-weight: 600;
+  color: #ffaaaa;
+  margin-bottom: 12px;
+  font-family: ui-monospace, 'JetBrains Mono', monospace;
+}
+.crash-stack-label {
+  color: var(--muted);
+  font-size: 11px;
+  margin-bottom: 4px;
+}
+.crash-stack {
+  background: rgba(0,0,0,0.45);
+  border: 1px solid var(--border);
+  border-radius: 4px;
+  padding: 8px 10px;
+  font-family: ui-monospace, 'JetBrains Mono', monospace;
+  font-size: 11px;
+  max-height: 280px;
+  overflow: auto;
+  margin: 0 0 10px 0;
+  white-space: pre-wrap;
+  color: #cfcfd6;
+}
+.crash-note {
+  font-size: 11px;
+  color: var(--muted);
+  line-height: 1.5;
+}
+.crash-actions {
+  display: flex;
+  justify-content: flex-end;
+  gap: 8px;
+  padding: 10px 18px;
+  border-top: 1px solid var(--border);
+  background: rgba(0,0,0,0.25);
+}
+.claude-btn.danger { background: rgba(255, 80, 80, 0.85); color: #fff; border-color: rgba(255, 80, 80, 1); }
+.claude-btn.danger:hover { background: rgba(255, 110, 110, 1); }
+
+/* Crash recovery toast (shown on startup if previous session crashed) */
+.crash-recovery-toast {
+  position: fixed;
+  bottom: 70px;
+  right: 24px;
+  background: #1a1f2a;
+  border: 1px solid rgba(255, 200, 100, 0.5);
+  border-radius: 6px;
+  padding: 12px 16px;
+  z-index: 800;
+  max-width: 340px;
+  box-shadow: 0 4px 16px rgba(0,0,0,0.5);
+  font-size: 12px;
+}
+.crash-recovery-toast h4 {
+  margin: 0 0 6px 0;
+  color: #ffcc66;
+  font-size: 13px;
+}
+.crash-recovery-toast p { margin: 0 0 8px 0; color: var(--muted); }
+.crash-recovery-toast .actions { display: flex; gap: 6px; justify-content: flex-end; }
+
+/* Per-tool first-use guide popup */
+.tool-guide {
+  position: fixed;
+  inset: 0;
+  background: rgba(0, 0, 0, 0.65);
+  z-index: 9000;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+}
+.tool-guide-card {
+  width: 460px;
+  max-width: 90vw;
+  background: #1a1f2a;
+  border: 1px solid var(--accent-2);
+  border-radius: 8px;
+  box-shadow: 0 8px 30px rgba(76, 248, 197, 0.2);
+  overflow: hidden;
+}
+.tool-guide-head {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  padding: 10px 14px;
+  background: rgba(76, 248, 197, 0.1);
+  border-bottom: 1px solid var(--border);
+}
+.tool-guide-icon { font-size: 18px; }
+.tool-guide-title { flex: 1; font-weight: 700; color: var(--accent-2); }
+.tool-guide-close {
+  background: transparent;
+  border: 0;
+  color: var(--muted);
+  font-size: 20px;
+  cursor: pointer;
+  padding: 0 6px;
+  line-height: 1;
+}
+.tool-guide-close:hover { color: var(--text); }
+.tool-guide-body {
+  padding: 14px 18px;
+  font-size: 13px;
+  line-height: 1.55;
+  color: var(--text);
+}
+.tool-guide-shortcut {
+  padding: 0 18px 10px;
+  font-size: 12px;
+  color: var(--muted);
+}
+.tool-guide-shortcut kbd {
+  background: rgba(255,255,255,0.08);
+  border: 1px solid var(--border);
+  padding: 2px 6px;
+  border-radius: 3px;
+  font-family: ui-monospace, monospace;
+  font-size: 11px;
+}
+.tool-guide-foot {
+  display: flex;
+  justify-content: space-between;
+  align-items: center;
+  padding: 10px 14px;
+  border-top: 1px solid var(--border);
+  background: rgba(0,0,0,0.2);
+}
+.tool-guide-foot label {
+  font-size: 11px;
+  color: var(--muted);
+  display: flex;
+  align-items: center;
+  gap: 6px;
+  cursor: pointer;
+}
+
+/* Levels bar — horizontal strip above the viewport showing each level */
+.levels-bar {
+  display: flex;
+  align-items: center;
+  gap: 4px;
+  padding: 3px 8px;
+  background: linear-gradient(180deg, rgba(76, 248, 197, 0.06), transparent);
+  border-bottom: 1px solid var(--border);
+  font-size: 11px;
+  min-height: 28px;
+}
+.levels-bar-label {
+  color: var(--muted);
+  text-transform: uppercase;
+  font-weight: 700;
+  letter-spacing: 0.08em;
+  font-size: 10px;
+  margin-right: 6px;
+}
+.level-chip {
+  padding: 3px 10px;
+  border-radius: 12px;
+  border: 1px solid var(--border);
+  background: rgba(255,255,255,0.04);
+  color: var(--text);
+  cursor: pointer;
+  font-size: 11px;
+  display: inline-flex;
+  align-items: center;
+  gap: 6px;
+}
+.level-chip:hover { border-color: var(--accent-2); background: rgba(76,248,197,0.1); }
+.level-chip.active {
+  background: var(--accent-2);
+  color: #0a0a0f;
+  font-weight: 600;
+  border-color: var(--accent-2);
+}
+.level-chip-add {
+  background: transparent;
+  border: 1px dashed var(--muted);
+  color: var(--muted);
+  padding: 3px 8px;
+  border-radius: 12px;
+  cursor: pointer;
+  font-size: 11px;
+}
+.level-chip-add:hover { color: var(--accent-2); border-color: var(--accent-2); }
+.level-chip-action {
+  background: transparent;
+  border: 0;
+  color: var(--muted);
+  font-size: 11px;
+  padding: 3px 6px;
+  cursor: pointer;
+}
+.level-chip-action:hover { color: var(--accent-2); }

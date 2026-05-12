@@ -60,6 +60,13 @@ import {
   editPivot,
 } from './engine/ModelingTools';
 import { buildPaintballArena, makePaintGun, makePaintPlayer } from './engine/Paintball';
+import { installCrashHelper, getStashedCrashSnapshot, clearStashedCrash } from './engine/CrashHelper';
+import { LevelsManager } from './engine/Levels';
+import { listLibraryAnimations, applyBuiltinClip, importAnimationFile } from './engine/MixamoLibrary';
+import { getAnimations } from './engine/Animations';
+import { showGuide } from './engine/ToolGuide';
+// ActorTaxonomy is used inside HierarchyPanel + Primitives; main.ts doesn't
+// touch the kind values directly.
 
 const canvas = document.getElementById('canvas-3d') as HTMLCanvasElement;
 const viewportEl = canvas.parentElement as HTMLElement;
@@ -78,6 +85,48 @@ versionEl.textContent = `HairyEngine v${window.hairy?.version ?? '0.0.1'}`;
 
 const scene = new Scene();
 scene.seedDefault();
+
+// Crash recovery — installed early so any error after this point gets caught
+// and the scene is preserved in localStorage. The recovery toast (below)
+// checks if the previous session crashed and offers to restore.
+installCrashHelper(scene);
+// Show "you crashed last time, want to restore?" toast on startup.
+setTimeout(() => {
+  const stash = getStashedCrashSnapshot();
+  if (!stash) return;
+  const minutesAgo = Math.round((Date.now() - stash.at) / 60000);
+  if (minutesAgo > 60 * 24 * 7) {
+    // Older than a week — drop it, the user clearly moved on.
+    clearStashedCrash();
+    return;
+  }
+  const toast = document.createElement('div');
+  toast.className = 'crash-recovery-toast';
+  toast.innerHTML = `
+    <h4>⚠ Previous session crashed</h4>
+    <p>${minutesAgo < 1 ? 'Just now' : `${minutesAgo} min ago`}: ${stash.summary.slice(0, 120)}</p>
+    <div class="actions">
+      <button class="claude-btn" id="crash-dismiss">Dismiss</button>
+      <button class="claude-btn primary" id="crash-restore">Restore Scene</button>
+    </div>
+  `;
+  document.body.appendChild(toast);
+  toast.querySelector('#crash-restore')?.addEventListener('click', () => {
+    try {
+      const data = JSON.parse(stash.sceneJson);
+      scene.deserialize(data);
+      status.setStatus('Restored from crash recovery.');
+      clearStashedCrash();
+    } catch (err) {
+      status.setStatus(`Restore failed: ${(err as Error).message}`);
+    }
+    toast.remove();
+  });
+  toast.querySelector('#crash-dismiss')?.addEventListener('click', () => {
+    clearStashedCrash();
+    toast.remove();
+  });
+}, 1500);
 
 const history = new History();
 const playState = new PlayState(scene, history);
@@ -140,6 +189,73 @@ new DropZone(viewportEl, scene, project, history, (msg) => status.setStatus(msg)
 const updateToast = new UpdateToast(document.body);
 const ponksDrawer = new PonksDrawer(document.body, scene, (m) => status.setStatus(m));
 const multiplayer = new Multiplayer(scene, play);
+
+// Levels — multi-scene support inside one project. Stored in localStorage by
+// default; surfaced as a chip strip above the viewport so the user can jump
+// between MainMenu / Arena1 / Lobby / etc with one click.
+const levels = new LevelsManager(scene);
+function renderLevelsBar() {
+  const chips = document.getElementById('levels-chips') as HTMLElement;
+  if (!chips) return;
+  const state = levels.getState();
+  chips.innerHTML = '';
+  state.levels.forEach((lvl, idx) => {
+    const chip = document.createElement('button');
+    chip.className = `level-chip ${idx === state.currentLevel ? 'active' : ''}`;
+    chip.title = `${lvl.objectCount} objects · updated ${new Date(lvl.updatedAt).toLocaleTimeString()}`;
+    chip.textContent = `▣ ${lvl.name}`;
+    chip.addEventListener('click', () => {
+      try {
+        levels.switchTo(idx);
+        status.setStatus(`Switched to level "${lvl.name}"`);
+      } catch (err) {
+        status.setStatus(`Switch failed: ${(err as Error).message}`);
+      }
+    });
+    chips.appendChild(chip);
+  });
+  const addBtn = document.createElement('button');
+  addBtn.className = 'level-chip-add';
+  addBtn.textContent = '+ New Level';
+  addBtn.addEventListener('click', () => {
+    const name = prompt('Name for the new level?', `Level${state.levels.length + 1}`);
+    if (!name) return;
+    levels.add(name);
+    status.setStatus(`Created level "${name}"`);
+  });
+  chips.appendChild(addBtn);
+}
+levels.onChange(() => renderLevelsBar());
+renderLevelsBar();
+
+document.getElementById('levels-rename')?.addEventListener('click', () => {
+  const state = levels.getState();
+  const name = prompt('Rename level to?', state.levels[state.currentLevel].name);
+  if (!name) return;
+  levels.rename(state.currentLevel, name);
+});
+document.getElementById('levels-duplicate')?.addEventListener('click', () => {
+  const state = levels.getState();
+  const idx = levels.duplicate(state.currentLevel);
+  if (idx >= 0) {
+    levels.switchTo(idx);
+    status.setStatus('Level duplicated');
+  }
+});
+document.getElementById('levels-delete')?.addEventListener('click', () => {
+  const state = levels.getState();
+  if (state.levels.length <= 1) {
+    status.setStatus('Cannot delete the only level');
+    return;
+  }
+  if (!confirm(`Delete level "${state.levels[state.currentLevel].name}"? This cannot be undone.`)) return;
+  if (levels.remove(state.currentLevel)) {
+    status.setStatus('Level deleted');
+  }
+});
+document.getElementById('levels-help')?.addEventListener('click', () => {
+  showGuide('levels', true);
+});
 // Declared up-front so the scene selection listener below can poll its
 // isActive() without forward-ref ordering issues.
 // eslint-disable-next-line prefer-const
@@ -151,11 +267,12 @@ faceExtrudeRef = faceExtrude;
 // normal translate/rotate/scale gizmo (we just disable picking when active).
 const faceModeBtn = document.getElementById('face-mode-btn') as HTMLButtonElement;
 faceModeBtn.addEventListener('click', () => {
+  showGuide('face-mode');
   const next = !faceExtrude.isActive();
   faceExtrude.setActive(next);
   status.setStatus(
     next
-      ? 'Face mode — hover a Box (Wall/Floor/Cube/etc.) and drag the cyan arrow to extrude'
+      ? 'Face mode — hover ANY mesh (Box, GLB, anything flat) and drag the cyan arrow'
       : 'Face mode off',
   );
 });
@@ -220,6 +337,7 @@ function applyWireframe(on: boolean) {
 }
 
 wireframeBtn.addEventListener('click', () => {
+  showGuide('wireframe');
   wireframeOn = !wireframeOn;
   wireframeBtn.classList.toggle('active', wireframeOn);
   // Always clear first, then re-add if turning on. Defeats any stale overlay
@@ -458,6 +576,7 @@ function applyGridSnap() {
 }
 
 gridSnapBtn.addEventListener('click', () => {
+  showGuide('grid-snap');
   const on = !viewport.gizmo.isAlwaysSnap();
   viewport.gizmo.setAlwaysSnap(on, scene.getGridSize());
   gridSnapBtn.classList.toggle('active', on);
@@ -491,6 +610,7 @@ let pendingOp: PendingOp | null = null;
 const subtractBtn = document.getElementById('subtract-btn') as HTMLButtonElement;
 const mergeBtn = document.getElementById('merge-btn') as HTMLButtonElement;
 subtractBtn.addEventListener('click', () => {
+  showGuide('subtract');
   const sel = scene.selection;
   if (!sel || !(sel as THREE.Mesh).isMesh) {
     status.setStatus('Select a mesh to use as the cutter first (the doorway shape)');
@@ -502,6 +622,7 @@ subtractBtn.addEventListener('click', () => {
   status.setStatus(`Subtract: now click the WALL to cut "${pendingOp.mesh.name}" out of`);
 });
 mergeBtn.addEventListener('click', () => {
+  showGuide('merge');
   const sel = scene.selection;
   if (!sel || !(sel as THREE.Mesh).isMesh) {
     status.setStatus('Select a mesh first, then click Merge, then click another mesh to fuse them.');
@@ -768,6 +889,7 @@ const topdown = new TopDownView(viewportEl, scene, (obj) => {
   scene.select(obj);
 });
 topdownBtn.addEventListener('click', () => {
+  showGuide('topdown');
   const next = !topdown.isActive();
   topdown.setActive(next);
   topdownBtn.classList.toggle('active', next);
@@ -777,6 +899,7 @@ topdownBtn.addEventListener('click', () => {
 // --- UE5 modeling tools popup ---------------------------------------------
 const modelingBtn = document.getElementById('modeling-btn') as HTMLButtonElement;
 modelingBtn.addEventListener('click', () => {
+  showGuide('modeling');
   // Close any existing popup first.
   document.querySelectorAll('.modeling-popup').forEach((p) => p.remove());
   const popup = document.createElement('div');
@@ -839,6 +962,7 @@ modelingBtn.addEventListener('click', () => {
 // --- Paintball arena bootstrap --------------------------------------------
 const paintballBtn = document.getElementById('paintball-btn') as HTMLButtonElement;
 paintballBtn.addEventListener('click', () => {
+  showGuide('paintball');
   if (!confirm('Build a starter paintball arena? This adds a floor, boundary walls, cover boxes, two spawn points, and a starter player to the scene.')) return;
   try {
     const n = buildPaintballArena(scene, history);
@@ -847,6 +971,80 @@ paintballBtn.addEventListener('click', () => {
     console.error('[paintball]', err);
     status.setStatus(`Arena build failed: ${(err as Error).message}`);
   }
+});
+
+// --- Mixamo animation library --------------------------------------------
+const mixamoBtn = document.getElementById('mixamo-btn') as HTMLButtonElement;
+mixamoBtn.addEventListener('click', async () => {
+  showGuide('mixamo');
+  const sel = scene.selection;
+  if (!sel) {
+    status.setStatus('Select a character first, then click 💃 to apply animations');
+    return;
+  }
+  document.querySelectorAll('.modeling-popup').forEach((p) => p.remove());
+  const popup = document.createElement('div');
+  popup.className = 'modeling-popup';
+  popup.style.maxHeight = '70vh';
+  popup.style.overflowY = 'auto';
+  popup.innerHTML = '<div class="mp-hint">Animation library — applies to selected actor</div><div class="mp-sep"></div><div id="mixamo-list">Loading…</div>';
+  const rect = mixamoBtn.getBoundingClientRect();
+  popup.style.left = `${rect.left}px`;
+  popup.style.top = `${rect.bottom + 4}px`;
+  document.body.appendChild(popup);
+  const list = await listLibraryAnimations();
+  const listEl = popup.querySelector('#mixamo-list') as HTMLElement;
+  listEl.innerHTML = '';
+  if (list.length === 0) {
+    listEl.innerHTML = '<div class="mp-hint">No animation clips found.<br>Drop Mixamo .glb files into the Assets panel.</div>';
+  }
+  for (const entry of list) {
+    const btn = document.createElement('button');
+    btn.textContent = entry.source === 'builtin' ? `✨ ${entry.name}` : `📁 ${entry.name}`;
+    btn.title = entry.source === 'builtin'
+      ? 'Procedural built-in clip — works on Mixamo-rigged characters'
+      : `${entry.path} (${entry.size ?? '?'} bytes)`;
+    btn.addEventListener('click', async () => {
+      try {
+        let added: string[] = [];
+        if (entry.source === 'builtin') {
+          const ok = applyBuiltinClip(entry.path, sel);
+          if (ok) added = [entry.name];
+          else throw new Error('Character has no Mixamo-style bones (mixamorig:*) — try a humanoid GLB');
+        } else {
+          added = await importAnimationFile(entry.path, sel);
+        }
+        status.setStatus(`Applied "${entry.name}" — ${added.length} clip${added.length === 1 ? '' : 's'} added. See Selection toolbar to play.`);
+        // Re-render selection toolbar so the new clips show as buttons.
+        scene.notifyChanged();
+        scene.select(sel);
+      } catch (err) {
+        status.setStatus(`Apply failed: ${(err as Error).message}`);
+      }
+      popup.remove();
+    });
+    listEl.appendChild(btn);
+  }
+  // Show what's currently on the actor
+  const currentClips = getAnimations(sel);
+  if (currentClips.length > 0) {
+    const div = document.createElement('div');
+    div.className = 'mp-hint';
+    div.style.marginTop = '8px';
+    div.style.borderTop = '1px solid var(--border)';
+    div.style.paddingTop = '8px';
+    div.textContent = `Already attached: ${currentClips.map((c) => c.name).join(', ')}`;
+    listEl.appendChild(div);
+  }
+  setTimeout(() => {
+    const onAway = (ev: MouseEvent) => {
+      if (!popup.contains(ev.target as Node)) {
+        popup.remove();
+        document.removeEventListener('click', onAway);
+      }
+    };
+    document.addEventListener('click', onAway);
+  }, 0);
 });
 
 // Multiplayer connect toggle

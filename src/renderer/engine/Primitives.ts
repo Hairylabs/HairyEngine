@@ -1,7 +1,10 @@
 import * as THREE from 'three';
+import { setActorKind } from './ActorTaxonomy';
 
 // Factory functions for the +Add menu. Each builds a fresh, ready-to-add object;
 // callers push the result into Scene so onSceneChanged listeners fire.
+// Each primitive is stamped with its HairyEngine ActorKind so the Hierarchy
+// panel + filters can group them sensibly.
 
 const PALETTE = [0xff3a8c, 0x4cf8c5, 0xffd166, 0x8a8aff, 0xff9f5a, 0x66c9ff];
 let paletteIdx = 0;
@@ -24,6 +27,7 @@ function mesh(geom: THREE.BufferGeometry, name: string) {
   m.name = name;
   m.castShadow = true;
   m.receiveShadow = true;
+  setActorKind(m, 'prop');
   return m;
 }
 
@@ -68,6 +72,7 @@ export function makePointLight() {
   );
   helper.userData.lightHelper = true;
   l.add(helper);
+  setActorKind(l, 'light');
   return l;
 }
 
@@ -86,6 +91,7 @@ export function makeSceneCamera() {
   helper.userData.isCameraHelper = true;
   helper.userData.deletable = false;
   cam.add(helper);
+  setActorKind(cam, 'camera');
   return cam;
 }
 
@@ -124,12 +130,14 @@ export function makePhysicsSphere() {
 export function makeWall() {
   const m = mesh(new THREE.BoxGeometry(4, 3, 0.2), 'Wall');
   m.position.set(0, 1.5, 0);
+  setActorKind(m, 'brush');
   return m;
 }
 
 export function makeFloor() {
   const m = mesh(new THREE.BoxGeometry(8, 0.2, 8), 'Floor');
   m.position.set(0, 0.1, 0);
+  setActorKind(m, 'brush');
   return m;
 }
 
@@ -160,6 +168,7 @@ export function makeRamp() {
   ramp.name = 'Ramp';
   ramp.castShadow = true;
   ramp.receiveShadow = true;
+  setActorKind(ramp, 'brush');
   return ramp;
 }
 
@@ -172,6 +181,7 @@ export function makeStairs() {
     step.position.set(0, 0.15 + i * 0.3, -i * 0.5);
     group.add(step);
   }
+  setActorKind(group, 'brush');
   return group;
 }
 
@@ -189,6 +199,7 @@ export function makeSpawnPoint() {
   helper.userData.isSpawnHelper = true;
   helper.userData.deletable = false;
   group.add(helper);
+  setActorKind(group, 'spawn');
   return group;
 }
 
@@ -214,5 +225,6 @@ export function makeFPSPlayer() {
     { type: 'Crosshair', params: {} },
     { type: 'Shooter', params: {} },
   ];
+  setActorKind(group, 'hero');
   return group;
 }
