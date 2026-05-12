@@ -339,13 +339,47 @@ viewport.onGizmoModeChanged((mode) => {
 });
 
 // Grid snap toggle — Hammer/ProBuilder-style level-builder mode.
+// Tied to the visible grid size so the snap step is exactly what the user
+// sees as grid bars. Click the size button to cycle through preset spacings.
 const gridSnapBtn = document.getElementById('grid-snap-btn') as HTMLButtonElement;
+const gridSizeBtn = document.getElementById('grid-size-btn') as HTMLButtonElement;
+const GRID_SIZE_CYCLE = [0.1, 0.25, 0.5, 1, 2, 5];
+
+function formatGridSize(s: number): string {
+  return s >= 1 ? `${s}m` : `${(s * 100).toFixed(0)}cm`;
+}
+
+function applyGridSnap() {
+  const on = viewport.gizmo.isAlwaysSnap();
+  viewport.gizmo.setAlwaysSnap(on, scene.getGridSize());
+}
+
 gridSnapBtn.addEventListener('click', () => {
   const on = !viewport.gizmo.isAlwaysSnap();
-  viewport.gizmo.setAlwaysSnap(on, 1.0);
+  viewport.gizmo.setAlwaysSnap(on, scene.getGridSize());
   gridSnapBtn.classList.toggle('active', on);
-  status.setStatus(on ? 'Grid snap ON (1m steps)' : 'Grid snap OFF');
+  status.setStatus(
+    on
+      ? `Grid snap ON (${formatGridSize(scene.getGridSize())} steps)`
+      : 'Grid snap OFF',
+  );
 });
+
+gridSizeBtn.addEventListener('click', () => {
+  const current = scene.getGridSize();
+  const idx = GRID_SIZE_CYCLE.findIndex((s) => Math.abs(s - current) < 1e-6);
+  const next = GRID_SIZE_CYCLE[(idx + 1) % GRID_SIZE_CYCLE.length];
+  scene.setGridSize(next);
+});
+
+scene.onGridSizeChanged((size) => {
+  gridSizeBtn.textContent = formatGridSize(size);
+  applyGridSnap();
+  status.setStatus(`Grid size: ${formatGridSize(size)}`);
+});
+
+// Initial label
+gridSizeBtn.textContent = formatGridSize(scene.getGridSize());
 
 // Boolean subtract — first click marks the selection as "cutter", second
 // click on a target mesh runs the cut. Esc to cancel.

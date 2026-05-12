@@ -67,6 +67,52 @@ export class Scene {
     this.sceneListeners.forEach((l) => l());
   }
 
+  // --- Grid settings ------------------------------------------------------
+  // Grid spacing (meters per cell) and listeners so the toolbar UI + gizmo
+  // snap can react. Rebuilds the visible THREE.GridHelper so what the user
+  // sees is exactly what they're snapped to.
+
+  private gridSize = 1;
+  private gridSizeListeners: Array<(size: number) => void> = [];
+
+  getGridSize(): number {
+    return this.gridSize;
+  }
+
+  setGridSize(size: number) {
+    const s = Math.max(0.01, size);
+    if (s === this.gridSize) return;
+    this.gridSize = s;
+    this.rebuildGridHelper();
+    this.gridSizeListeners.forEach((l) => l(s));
+  }
+
+  onGridSizeChanged(l: (size: number) => void) {
+    this.gridSizeListeners.push(l);
+  }
+
+  private rebuildGridHelper() {
+    // Find and remove the existing grid helper, then rebuild at the new size.
+    // Keep the ground plane in place — only the grid lines change.
+    const existing = this.three.getObjectByName('Grid');
+    if (existing) {
+      this.three.remove(existing);
+      (existing as unknown as { geometry?: { dispose: () => void } }).geometry?.dispose?.();
+      (existing as unknown as { material?: { dispose: () => void } }).material?.dispose?.();
+    }
+    // Total extent stays at 60m; divisions = 60 / gridSize cells.
+    const extent = 60;
+    const divisions = Math.round(extent / this.gridSize);
+    const grid = new THREE.GridHelper(extent, divisions, 0x80c0ff, 0x4a5060);
+    grid.name = 'Grid';
+    grid.position.y = 0.001;
+    grid.userData.deletable = false;
+    const mat = grid.material as THREE.Material;
+    mat.transparent = true;
+    mat.opacity = 0.7;
+    this.three.add(grid);
+  }
+
   // Walk the editable group only — hierarchy panel doesn't need to show lights/grid.
   editableRoots(): THREE.Object3D[] {
     return this.editable.children;
