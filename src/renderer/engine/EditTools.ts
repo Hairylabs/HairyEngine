@@ -86,6 +86,89 @@ export function duplicateAlongAxis(
   return made.length;
 }
 
+// "Extrude" the selected mesh along an axis by `amount` meters.
+// This isn't true face-extrude (we don't have a half-edge mesh system yet),
+// but for the blockout workflow it does what users expect: make the wall
+// taller, the floor longer, the ramp wider — without re-scaling so origins
+// behave naturally.
+//
+// Strategy:
+//   - For a Box-shaped mesh: rebuild the BoxGeometry with the dimension on
+//     the chosen axis grown by `amount`, then shift position by amount/2
+//     along the same axis so the user's "anchor" stays put.
+//   - For arbitrary geometry: clone the mesh, translate the clone by amount
+//     along the axis, return the pair — fallback is a duplicate they can
+//     then merge manually (TODO: wire boolean union here once that's stable
+//     enough to be invisible to the user).
+//
+// Real face-extrude (click a face, drag the handle) lives behind a TODO in
+// ROADMAP.md.
+export function extrudeAlong(
+  scene: Scene,
+  history: History,
+  axis: 'x' | 'y' | 'z',
+  amount: number,
+): boolean {
+  const sel = scene.selection;
+  if (!sel) return false;
+  const mesh = sel as THREE.Mesh;
+  if (!mesh.isMesh) return false;
+  const geom = mesh.geometry as THREE.BufferGeometry & {
+    parameters?: { width?: number; height?: number; depth?: number };
+    type?: string;
+  };
+
+  // BoxGeometry path — clean resize.
+  if (geom?.type === 'BoxGeometry' && geom.parameters) {
+    const w = geom.parameters.width ?? 1;
+    const h = geom.parameters.height ?? 1;
+    const d = geom.parameters.depth ?? 1;
+    const before = {
+      w,
+      h,
+      d,
+      pos: mesh.position.clone(),
+    };
+    const next = { w, h, d, pos: mesh.position.clone() };
+    if (axis === 'x') {
+      next.w = w + amount;
+      next.pos.x += amount * 0.5;
+    } else if (axis === 'y') {
+      next.h = h + amount;
+      next.pos.y += amount * 0.5;
+    } else {
+      next.d = d + amount;
+      next.pos.z += amount * 0.5;
+    }
+
+    const oldGeom = mesh.geometry;
+    mesh.geometry = new THREE.BoxGeometry(next.w, next.h, next.d);
+    mesh.position.copy(next.pos);
+
+    history.record({
+      label: `Extrude ${axis} +${amount}`,
+      do: () => {
+        mesh.geometry = new THREE.BoxGeometry(next.w, next.h, next.d);
+        mesh.position.copy(next.pos);
+      },
+      undo: () => {
+        mesh.geometry = oldGeom;
+        mesh.position.copy(before.pos);
+      },
+    });
+    scene.notifyChanged();
+    return true;
+  }
+
+  // Fallback: just duplicate offset along the axis. Crude but visible.
+  const copy = mesh.clone(true);
+  copy.position[axis] += amount;
+  copy.name = `${mesh.name}_extrude`;
+  scene.addInternal(copy);
+  scene.notifyChanged();
+  return true;
+}
+
 // Scatter N copies of the selected object randomly within a radius around
 // its current position. Random Y rotation. Like Unity's foliage placement
 // brush in a single click.

@@ -46,6 +46,7 @@ import {
   snapToGrid,
   duplicateAlongAxis,
   scatter,
+  extrudeAlong,
 } from './engine/EditTools';
 import { Multiplayer } from './engine/Multiplayer';
 import { PonksDrawer } from './ui/PonksDrawer';
@@ -388,6 +389,22 @@ document.getElementById('sel-snap')?.addEventListener('click', () => {
     console.error('[sel-snap]', err);
   }
 });
+function doExtrude(axis: 'x' | 'y' | 'z') {
+  try {
+    const ok = extrudeAlong(scene, history, axis, 1);
+    status.setStatus(
+      ok
+        ? `Extruded +1m on ${axis.toUpperCase()}`
+        : 'Select a mesh first',
+    );
+  } catch (err) {
+    console.error('[extrude]', err);
+    status.setStatus(`Extrude failed: ${(err as Error).message}`);
+  }
+}
+document.getElementById('sel-extrude-x')?.addEventListener('click', () => doExtrude('x'));
+document.getElementById('sel-extrude-y')?.addEventListener('click', () => doExtrude('y'));
+document.getElementById('sel-extrude-z')?.addEventListener('click', () => doExtrude('z'));
 
 // Drop-to-floor (Unreal "End" key)
 document.getElementById('drop-floor-btn')?.addEventListener('click', () => {

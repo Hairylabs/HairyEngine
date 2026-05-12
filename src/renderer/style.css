@@ -808,6 +808,19 @@ button:hover { background: #25253a; }
   color: var(--text);
   border-color: var(--border);
 }
+.sel-divider {
+  width: 1px;
+  align-self: stretch;
+  background: var(--border);
+  margin: 2px 4px;
+}
+.sel-label-small {
+  color: var(--muted);
+  font-size: 10px;
+  text-transform: uppercase;
+  letter-spacing: 0.05em;
+  padding: 0 2px;
+}
 
 /* Play mode overlay — green border on the viewport so it's obvious we're running */
 .viewport.is-playing::before {
