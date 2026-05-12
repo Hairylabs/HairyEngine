@@ -50,6 +50,7 @@ import {
 } from './engine/EditTools';
 import { Multiplayer } from './engine/Multiplayer';
 import { PonksDrawer } from './ui/PonksDrawer';
+import { FaceExtrude } from './engine/FaceExtrude';
 
 const canvas = document.getElementById('canvas-3d') as HTMLCanvasElement;
 const viewportEl = canvas.parentElement as HTMLElement;
@@ -130,6 +131,40 @@ new DropZone(viewportEl, scene, project, history, (msg) => status.setStatus(msg)
 const updateToast = new UpdateToast(document.body);
 const ponksDrawer = new PonksDrawer(document.body, scene, (m) => status.setStatus(m));
 const multiplayer = new Multiplayer(scene, play);
+const faceExtrude = new FaceExtrude(canvas, viewport.camera, scene, history);
+
+// Face mode button (toolbar). Toggle on/off; mutually exclusive with the
+// normal translate/rotate/scale gizmo (we just disable picking when active).
+const faceModeBtn = document.getElementById('face-mode-btn') as HTMLButtonElement;
+faceModeBtn.addEventListener('click', () => {
+  const next = !faceExtrude.isActive();
+  faceExtrude.setActive(next);
+  status.setStatus(
+    next
+      ? 'Face mode — hover a Box (Wall/Floor/Cube/etc.) and drag the cyan arrow to extrude'
+      : 'Face mode off',
+  );
+});
+faceExtrude.onChange((on) => {
+  faceModeBtn.classList.toggle('active', on);
+});
+// F key toggles face mode for power users.
+window.addEventListener('keydown', (e) => {
+  if (
+    e.key.toLowerCase() === 'f' &&
+    !e.ctrlKey &&
+    !e.metaKey &&
+    !isEditableTarget(e.target)
+  ) {
+    // Existing F = focus selected; only intercept when in shift+f? Actually
+    // 'f' is already focus; switch to a dedicated combo to avoid stomping.
+    // Use Shift+F for face mode.
+    if (e.shiftKey) {
+      e.preventDefault();
+      faceExtrude.setActive(!faceExtrude.isActive());
+    }
+  }
+});
 
 // Help / About now live in the native application menu (see src/main/menu.ts).
 // The native menu triggers IPC events `menu:showAbout`, `menu:checkUpdates`,

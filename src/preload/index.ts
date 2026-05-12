@@ -58,7 +58,7 @@ export type UpdaterEvent =
   | { type: 'error'; message: string };
 
 const api = {
-  version: '0.0.14',
+  version: '0.0.15',
   blender: {
     connect: (host?: string, port?: number): Promise<ConnectResult> =>
       ipcRenderer.invoke('blender:connect', host, port),

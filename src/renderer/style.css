@@ -731,6 +731,23 @@ button:hover { background: #25253a; }
   border-color: rgba(255, 58, 140, 0.45);
   color: #ffd2e3;
 }
+
+/* Floating distance label for the face-extrude widget */
+.face-extrude-label {
+  position: fixed;
+  z-index: 1000;
+  background: rgba(0, 0, 0, 0.7);
+  color: var(--accent-2);
+  border: 1px solid var(--accent-2);
+  padding: 3px 8px;
+  border-radius: 4px;
+  font-family: ui-monospace, monospace;
+  font-size: 12px;
+  font-weight: 700;
+  pointer-events: none;
+  white-space: nowrap;
+}
+.face-extrude-label[hidden] { display: none; }
 .toolbar-sep {
   width: 1px;
   align-self: stretch;
