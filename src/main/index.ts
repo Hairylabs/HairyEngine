@@ -1,4 +1,9 @@
 import { app, BrowserWindow, dialog, ipcMain, shell } from 'electron';
+import { installLogger, logRendererWindow } from './logger';
+import { installAppMenu } from './menu';
+
+// Logger first so any later error here gets captured.
+installLogger();
 import { readFile, writeFile } from 'node:fs/promises';
 import { basename, join } from 'node:path';
 import { blenderConnection, BlenderResponse } from './blender';
@@ -44,6 +49,7 @@ function createWindow() {
   });
 
   mainWindow.once('ready-to-show', () => mainWindow?.show());
+  logRendererWindow(mainWindow);
 
   mainWindow.webContents.setWindowOpenHandler((details) => {
     shell.openExternal(details.url);
@@ -326,6 +332,7 @@ app.whenReady().then(() => {
   registerIpc();
   registerToolBridge();
   registerUpdater(() => mainWindow);
+  installAppMenu(() => mainWindow);
   createWindow();
 
   app.on('activate', () => {

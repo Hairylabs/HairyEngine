@@ -130,28 +130,63 @@ const updateToast = new UpdateToast(document.body);
 const ponksDrawer = new PonksDrawer(document.body, scene, (m) => status.setStatus(m));
 const multiplayer = new Multiplayer(scene, play);
 
-// About modal — version, repo, manual update check. Lives next to Help so
-// the user has a single "tell me what I'm running and update it" spot.
-const aboutBtn = document.getElementById('menu-about') as HTMLButtonElement;
-aboutBtn.addEventListener('click', () => {
+// Help / About now live in the native application menu (see src/main/menu.ts).
+// The native menu triggers IPC events `menu:showAbout`, `menu:checkUpdates`,
+// `menu:openLog` which we handle here.
+window.hairy.menu.onAction((action) => {
+  switch (action) {
+    case 'about':
+      showAboutDialog();
+      break;
+    case 'check-updates':
+      updateToast.beginManualCheck();
+      window.hairy.updater.check().then((r) => {
+        if (!r.ok) status.setStatus(`Update check: ${r.error}`);
+      });
+      break;
+    case 'open-log':
+      window.hairy.log.showFile();
+      break;
+    case 'open-repo':
+      window.open('https://github.com/Hairylabs/HairyEngine', '_blank');
+      break;
+    case 'open-releases':
+      window.open('https://github.com/Hairylabs/HairyEngine/releases', '_blank');
+      break;
+    case 'new-project':
+      project.newProject();
+      break;
+    case 'open-project':
+      project.open();
+      break;
+    case 'save':
+      project.save();
+      break;
+    case 'save-as':
+      project.saveAs();
+      break;
+  }
+});
+
+function showAboutDialog() {
   const dialog = document.createElement('div');
   dialog.className = 'claude-modal-backdrop';
   dialog.innerHTML = `
     <div class="claude-modal">
-      <div class="claude-modal-head">About HairyEngine</div>
+      <div class="claude-modal-head">HairyEngine</div>
       <div class="claude-modal-body">
         <div style="font-size:13px; line-height:1.5;">
-          <div><strong>HairyEngine</strong> v${window.hairy.version}</div>
+          <div style="font-size:18px; font-weight:700;">v${window.hairy.version}</div>
           <div style="margin-top:8px; color: var(--muted);">
-            Desktop scene editor for browser games. Three.js + Electron + Rapier + Blender MCP + in-engine Claude chat using your Claude Code subscription.
+            Desktop scene editor for browser games.<br>
+            Three.js + Electron + Rapier physics + Blender MCP + in-engine Claude chat using your Claude Code subscription.
           </div>
           <div style="margin-top:14px;">
             <button class="claude-btn primary" id="about-update">Check for updates</button>
-            <button class="claude-btn" id="about-repo">Open GitHub</button>
-            <button class="claude-btn" id="about-releases">Releases</button>
+            <button class="claude-btn" id="about-log">Show log file</button>
           </div>
           <div style="margin-top:14px; color: var(--muted); font-size:11px;">
-            Public repo: <code>Hairylabs/HairyEngine</code> · License: MIT (planned)
+            <a href="#" id="about-repo" style="color: var(--accent-2);">Hairylabs/HairyEngine</a> · MIT (planned)
           </div>
         </div>
       </div>
@@ -168,46 +203,14 @@ aboutBtn.addEventListener('click', () => {
     if (!r.ok) status.setStatus(`Update check: ${r.error}`);
     dialog.remove();
   });
-  dialog.querySelector('#about-repo')?.addEventListener('click', () => {
+  dialog.querySelector('#about-log')?.addEventListener('click', () => {
+    window.hairy.log.showFile();
+  });
+  dialog.querySelector('#about-repo')?.addEventListener('click', (e) => {
+    e.preventDefault();
     window.open('https://github.com/Hairylabs/HairyEngine', '_blank');
   });
-  dialog.querySelector('#about-releases')?.addEventListener('click', () => {
-    window.open('https://github.com/Hairylabs/HairyEngine/releases', '_blank');
-  });
-});
-
-// Help menu — manual update check, project repo link, version.
-const helpBtn = document.getElementById('menu-help') as HTMLButtonElement;
-helpBtn.addEventListener('click', () => {
-  openMenuPopup(helpBtn, [
-    {
-      label: `Check for updates  (v${window.hairy.version})`,
-      onClick: async () => {
-        updateToast.beginManualCheck();
-        const r = await window.hairy.updater.check();
-        if (!r.ok) {
-          status.setStatus(`Update check: ${r.error}`);
-        }
-      },
-    },
-    { sep: true },
-    {
-      label: 'Open repo on GitHub',
-      onClick: () => {
-        window.open('https://github.com/Hairylabs/HairyEngine', '_blank');
-      },
-    },
-    {
-      label: 'Open Releases page',
-      onClick: () => {
-        window.open(
-          'https://github.com/Hairylabs/HairyEngine/releases',
-          '_blank',
-        );
-      },
-    },
-  ]);
-});
+}
 
 // Console panel + bottom-tab switching + collapse toggle
 const consoleEl = document.getElementById('console-body') as HTMLElement;
@@ -318,8 +321,13 @@ subtractBtn.addEventListener('click', () => {
 
 // Drop-to-floor (Unreal "End" key)
 document.getElementById('drop-floor-btn')?.addEventListener('click', () => {
-  const ok = dropToFloor(scene, history);
-  status.setStatus(ok ? 'Dropped to floor' : 'Select an object first');
+  try {
+    const ok = dropToFloor(scene, history);
+    status.setStatus(ok ? 'Dropped to floor' : 'Select an object first');
+  } catch (err) {
+    console.error('Drop-to-floor failed:', err);
+    status.setStatus(`Drop-to-floor failed: ${(err as Error).message}`);
+  }
 });
 
 // Snap selection to nearest grid intersection (post-hoc cleanup)
@@ -333,18 +341,28 @@ window.addEventListener('keydown', (e) => {
 
 // Duplicate along axis — defaults to 5 copies, 2m apart along X
 document.getElementById('dup-axis-btn')?.addEventListener('click', () => {
-  const n = duplicateAlongAxis(scene, history, 5, 'x', 2);
-  status.setStatus(
-    n > 0 ? `Duplicated ×${n} along +X by 2m` : 'Select an object first',
-  );
+  try {
+    const n = duplicateAlongAxis(scene, history, 5, 'x', 2);
+    status.setStatus(
+      n > 0 ? `Duplicated ×${n} along +X by 2m` : 'Select an object first',
+    );
+  } catch (err) {
+    console.error('Duplicate-along-axis failed:', err);
+    status.setStatus(`Duplicate failed: ${(err as Error).message}`);
+  }
 });
 
 // Scatter — 8 random clones in a 4m radius
 document.getElementById('scatter-btn')?.addEventListener('click', () => {
-  const n = scatter(scene, history, 8, 4);
-  status.setStatus(
-    n > 0 ? `Scattered ${n} copies within 4m` : 'Select an object first',
-  );
+  try {
+    const n = scatter(scene, history, 8, 4);
+    status.setStatus(
+      n > 0 ? `Scattered ${n} copies within 4m` : 'Select an object first',
+    );
+  } catch (err) {
+    console.error('Scatter failed:', err);
+    status.setStatus(`Scatter failed: ${(err as Error).message}`);
+  }
 });
 
 // Multiplayer connect toggle
@@ -469,31 +487,8 @@ function addAndSelect(obj: THREE.Object3D) {
   history.push(new AddObjectCommand(scene, obj));
 }
 
-const fileBtn = document.getElementById('menu-file') as HTMLButtonElement;
-fileBtn.addEventListener('click', () => {
-  const items: MenuItem[] = [
-    { label: 'New', onClick: () => project.newProject() },
-    { label: 'Open…  Ctrl+O', onClick: () => project.open() },
-    { label: 'Save  Ctrl+S', onClick: () => project.save() },
-    { label: 'Save As…  Ctrl+Shift+S', onClick: () => project.saveAs() },
-  ];
-  const recents = project.recents();
-  if (recents.length > 0) {
-    items.push({ sep: true });
-    for (const r of recents.slice(0, 6)) {
-      items.push({
-        label: shortenPath(r),
-        onClick: () => project.openPath(r),
-      });
-    }
-  }
-  openMenuPopup(fileBtn, items);
-});
-
-function shortenPath(p: string): string {
-  if (p.length <= 40) return p;
-  return '…' + p.slice(-39);
-}
+// File operations now triggered by the native menu (Help|File menu in main).
+// The action handler at the bottom of this file dispatches to project methods.
 // Floating dropdown chats — toggled by their header buttons.
 const claudeBtn = document.getElementById('menu-claude') as HTMLButtonElement;
 const blenderBtn = document.getElementById('menu-blender') as HTMLButtonElement;

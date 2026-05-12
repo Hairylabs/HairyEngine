@@ -110,6 +110,15 @@ declare global {
           ) => void,
         ) => () => void;
       };
+      menu: {
+        onAction: (handler: (action: string) => void) => () => void;
+      };
+      log: {
+        write: (level: 'log' | 'info' | 'warn' | 'error', message: string) => void;
+        openFolder: () => Promise<void>;
+        showFile: () => Promise<void>;
+        tail: (lines?: number) => Promise<string>;
+      };
       bridge: {
         tempDir: () => Promise<string>;
         readGlb: (path: string) => Promise<

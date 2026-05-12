@@ -197,7 +197,31 @@ button:hover { background: #25253a; }
   border-bottom: 1px solid var(--border);
   background: rgba(0,0,0,0.25);
 }
-.panel-content { flex: 1; overflow-y: auto; padding: 6px 4px; }
+.panel-content {
+  flex: 1;
+  overflow-y: auto;
+  overflow-x: hidden;
+  padding: 6px 4px;
+  min-height: 0;
+}
+/* Force a visible scrollbar so the inspector is obviously scrollable.
+   Without this, Windows' auto-hide setting can leave users thinking
+   the panel is non-scrollable when content overflows. */
+.panel-content::-webkit-scrollbar { width: 10px; }
+.panel-content::-webkit-scrollbar-track { background: rgba(0,0,0,0.2); }
+.panel-content::-webkit-scrollbar-thumb {
+  background: var(--border);
+  border-radius: 5px;
+}
+.panel-content::-webkit-scrollbar-thumb:hover { background: var(--accent); }
+/* Same for the bottom content (console / assets) */
+.bottom-content::-webkit-scrollbar { width: 10px; }
+.bottom-content::-webkit-scrollbar-track { background: rgba(0,0,0,0.2); }
+.bottom-content::-webkit-scrollbar-thumb {
+  background: var(--border);
+  border-radius: 5px;
+}
+.bottom-content::-webkit-scrollbar-thumb:hover { background: var(--accent); }
 .panel-content .empty { padding: 30px 14px; color: var(--muted); font-size: 12px; text-align: center; }
 
 .center {

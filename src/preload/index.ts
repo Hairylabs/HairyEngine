@@ -58,7 +58,7 @@ export type UpdaterEvent =
   | { type: 'error'; message: string };
 
 const api = {
-  version: '0.0.9',
+  version: '0.0.10',
   blender: {
     connect: (host?: string, port?: number): Promise<ConnectResult> =>
       ipcRenderer.invoke('blender:connect', host, port),
@@ -135,6 +135,22 @@ const api = {
       ipcRenderer.on('ai:stream', listener);
       return () => ipcRenderer.removeListener('ai:stream', listener);
     },
+  },
+  menu: {
+    onAction: (handler: (action: string) => void): (() => void) => {
+      const listener = (_e: unknown, action: string) => handler(action);
+      ipcRenderer.on('menu:action', listener);
+      return () => ipcRenderer.removeListener('menu:action', listener);
+    },
+  },
+  log: {
+    /** Forward a renderer log entry to the main-process electron-log file. */
+    write: (level: 'log' | 'info' | 'warn' | 'error', message: string) => {
+      ipcRenderer.send('log:write', level, message);
+    },
+    openFolder: (): Promise<void> => ipcRenderer.invoke('log:openFolder'),
+    showFile: (): Promise<void> => ipcRenderer.invoke('log:showFile'),
+    tail: (lines = 200): Promise<string> => ipcRenderer.invoke('log:tail', lines),
   },
   bridge: {
     tempDir: (): Promise<string> => ipcRenderer.invoke('bridge:tempDir'),

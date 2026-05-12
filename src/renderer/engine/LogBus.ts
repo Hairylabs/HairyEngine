@@ -26,19 +26,25 @@ export function installLogBus() {
     const original = console[level].bind(console);
     console[level] = (...args: unknown[]) => {
       original(...args);
-      const entry: LogEntry = {
-        level,
-        timestamp: Date.now(),
-        message: args.map(formatArg).join(' '),
-      };
+      const message = args.map(formatArg).join(' ');
+      const entry: LogEntry = { level, timestamp: Date.now(), message };
       buffer.push(entry);
       if (buffer.length > MAX_ENTRIES) buffer.shift();
       listeners.forEach((l) => l(entry));
+      // Forward to the main-process rolling log file via the preload bridge.
+      // Guarded because the bridge may not be loaded yet in the very first
+      // tick (e.g. during preload script execution).
+      const w = window as unknown as {
+        hairy?: { log?: { write?: (lvl: string, msg: string) => void } };
+      };
+      try {
+        w.hairy?.log?.write?.(level, message);
+      } catch {
+        // never let logging crash the app
+      }
     };
   });
 
-  // Also surface uncaught errors and unhandled rejections — they currently
-  // only appear in DevTools, which players don't have open.
   window.addEventListener('error', (e) => {
     pushSynthetic('error', `Uncaught: ${e.message} (${e.filename}:${e.lineno})`);
   });
