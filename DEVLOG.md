@@ -4,6 +4,39 @@ Chronological log of meaningful changes. Reverse-chronological order at the top.
 
 ---
 
+## 2026-05-12 — Sprints 1, 2, 4 landed (0.0.5)
+
+**Sprint 1 — Character pipeline shipped:**
+- New "👤 FPS Player" Add-menu template. One click creates a Group named `Player` with: capsule body + CharacterController + Crosshair + Shooter scripts already attached. Press Play → walking shooting character.
+- `findBoneByName(root, name)` helper in `Animations.ts` — handles Mixamo's `mixamorig:` prefix variants + case-insensitive fallback. So users can type `RightHand` and we find the actual bone.
+- `listBones(root)` for future Inspector dropdown of bones on a SkinnedMesh.
+- New `AttachToBone` script — parent any object to a named bone on a named character. Use case: gun in player's hand, hat on head.
+
+**Sprint 2 — Multiplayer server scaffold:**
+- New `server/` directory with Colyseus + geckos.io scaffold. `ArenaRoom` Schema has `players` map (id, ponkTokenId, team, score, alive) + messages `setPonk` and `shoot`.
+- Colyseus on `ws://localhost:2567` for room state, geckos.io UDP on `:3000` for hot transforms. Designed to deploy to Edgegap for the UDP side.
+- Server is its own npm workspace with tsx for dev hot-reload.
+- Client-side wiring (the renderer's network adapter) still to come — that's the next chunk of Sprint 2.
+
+**Sprint 3 — Visual scripting:** intentionally deferred. The agent research showed building a node editor is a major UI effort, and our dyslexic-user persona is better served by **Claude-natural-language → custom-script-on-object** via the existing chat. Next iteration will add a Claude tool `engine_create_behavior_script(target, description)` that synthesizes and attaches a new behavior. Cheaper-faster path than a node graph.
+
+**Sprint 4 — Web3 / Ponks reader shipped:**
+- Installed `viem`. Added `src/renderer/engine/Web3.ts` with `connectWallet()` + `fetchPonks(owner)`.
+- 🦊 **Connect Wallet** button in the header. Clicks open MetaMask, prompts switch to PulseChain (chain `0x171` / 369), adds the chain if needed.
+- Ponks fetched directly from `0x2ec50f...40ba`. Uses `tokenOfOwnerByIndex` (Enumerable interface) — much cheaper than event scans.
+- IndexedDB cache for resolved NFT metadata (immutable, cache forever).
+- Display layer (drag thumbnail onto player head to set face texture) is the next step — for now `window.__ponks` holds the resolved list for debugging.
+
+**Bug fix:**
+- Floating chat panel ❌ close buttons rewired with document-level event delegation. Will work even if buttons are added after page load or if clicks land on the inner ✕ text node rather than the button itself.
+
+## 2026-05-12 — v0.0.4 — Repo public, no embedded token
+
+- `Hairylabs/HairyEngine` switched to public via `gh repo edit --visibility public`.
+- 0.0.4 released with `build.publish.private: false`. The .exe no longer contains any GitHub PAT.
+- 0.0.3 release + tag deleted from GitHub so no one downloads the version with the embedded token.
+- User revoked the `hairyengine-updater` PAT.
+
 ## 2026-05-12 — v0.0.3 released, auto-update live
 
 - First release published to GitHub Releases (Hairylabs/HairyEngine). NSIS installer + portable .exe at <https://github.com/Hairylabs/HairyEngine/releases/tag/v0.0.3>.

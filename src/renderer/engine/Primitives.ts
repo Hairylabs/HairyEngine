@@ -108,3 +108,33 @@ export function makePhysicsSphere() {
   ];
   return m;
 }
+
+// One-click FPS Player template. Drops a capsule the user can swap out for
+// any humanoid GLB later, pre-wired with movement, camera, crosshair, shoot,
+// and a default Mixamo-friendly position. Mirrors Unity's Starter Asset
+// First-Person template that lets non-coders go from empty scene to playable
+// character in a single click.
+export function makeFPSPlayer() {
+  const group = new THREE.Group();
+  group.name = 'Player';
+  group.position.set(0, 1, 0);
+
+  // Visual placeholder — a capsule the same size as the character collider.
+  // The artist replaces this with a Mixamo / Ready-rigged humanoid GLB later;
+  // CharacterController already uses a 0.4-radius / 1.8-height capsule collider.
+  const body = new THREE.Mesh(
+    new THREE.CapsuleGeometry(0.4, 1.0, 8, 16),
+    new THREE.MeshStandardMaterial({ color: 0xff3a8c, roughness: 0.6 }),
+  );
+  body.name = 'PlayerBody';
+  body.castShadow = true;
+  body.receiveShadow = true;
+  group.add(body);
+
+  group.userData.__scripts = [
+    { type: 'CharacterController', params: {} },
+    { type: 'Crosshair', params: {} },
+    { type: 'Shooter', params: {} },
+  ];
+  return group;
+}

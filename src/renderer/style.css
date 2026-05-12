@@ -61,6 +61,24 @@ button:hover { background: #25253a; }
   background: rgba(0,0,0,0.25);
   border-radius: 4px;
 }
+.wallet-btn {
+  background: linear-gradient(90deg, #ff7a00, #ff3a8c);
+  color: #1a0a14;
+  border: 1px solid #ff7a00;
+  font-weight: 700;
+  font-size: 11px;
+  padding: 5px 10px;
+  border-radius: 4px;
+  cursor: pointer;
+  margin-left: 8px;
+}
+.wallet-btn:hover { filter: brightness(1.1); }
+.wallet-btn.connected {
+  background: transparent;
+  color: var(--accent-2);
+  border-color: var(--accent-2);
+  font-family: ui-monospace, monospace;
+}
 
 .app-body {
   display: grid;

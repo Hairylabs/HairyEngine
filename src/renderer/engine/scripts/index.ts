@@ -11,3 +11,4 @@ import './Shooter';
 import './ParticleEmitter';
 import './MainCamera';
 import './FollowCamera';
+import './AttachToBone';

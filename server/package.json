@@ -1,0 +1,23 @@
+{
+  "name": "hairyengine-server",
+  "version": "0.0.1",
+  "private": true,
+  "description": "Authoritative server for HairyEngine multiplayer (Colyseus + geckos.io)",
+  "main": "index.ts",
+  "scripts": {
+    "dev": "tsx watch index.ts",
+    "start": "tsx index.ts"
+  },
+  "dependencies": {
+    "@colyseus/schema": "^3.0.0",
+    "@geckos.io/server": "^3.0.1",
+    "colyseus": "^0.16.0",
+    "ws": "^8.18.0"
+  },
+  "devDependencies": {
+    "@types/node": "^22.10.5",
+    "@types/ws": "^8.5.13",
+    "tsx": "^4.19.2",
+    "typescript": "^5.7.3"
+  }
+}

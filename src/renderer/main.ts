@@ -7,6 +7,7 @@ import { AddObjectCommand, RemoveObjectCommand } from './engine/Commands';
 import { dispatchEngineTool } from './engine/EngineTools';
 import { PlayState } from './engine/PlayState';
 import { HUD } from './engine/HUD';
+import { connectWallet, fetchPonks } from './engine/Web3';
 import './engine/scripts'; // side-effect: register built-in scripts
 import { installLogBus } from './engine/LogBus';
 import { ConsolePanel } from './ui/ConsolePanel';
@@ -32,6 +33,7 @@ import {
   makeSceneCamera,
   makePhysicsCube,
   makePhysicsSphere,
+  makeFPSPlayer,
 } from './engine/Primitives';
 
 const canvas = document.getElementById('canvas-3d') as HTMLCanvasElement;
@@ -144,6 +146,31 @@ window.hairy.tools.onInvoke(async (evt) => {
   await window.hairy.tools.result(evt.id, result);
 });
 
+// Wallet Connect — PulseChain + Ponks NFTs.
+const walletBtn = document.getElementById('wallet-btn') as HTMLButtonElement;
+walletBtn.addEventListener('click', async () => {
+  walletBtn.textContent = 'Connecting…';
+  const address = await connectWallet();
+  if (!address) {
+    walletBtn.textContent = '🦊 Connect Wallet';
+    return;
+  }
+  walletBtn.textContent = `${address.slice(0, 6)}…${address.slice(-4)}`;
+  walletBtn.classList.add('connected');
+  status.setStatus('Reading Ponks…');
+  try {
+    const ponks = await fetchPonks(address);
+    status.setStatus(`Loaded ${ponks.length} Ponk${ponks.length === 1 ? '' : 's'}`);
+    console.info('Ponks:', ponks);
+    // Future: render thumbnails in a sidebar drawer + let user drag onto a
+    // character's head to apply the NFT image as a texture.
+    (window as unknown as { __ponks?: unknown }).__ponks = ponks;
+  } catch (err) {
+    console.error('[ponks] fetch failed:', err);
+    status.setStatus('Ponks fetch failed — see Console');
+  }
+});
+
 console.info(`HairyEngine v${window.hairy.version} ready.`);
 
 scene.onSelectionChanged((obj) => {
@@ -227,6 +254,8 @@ function isEditableTarget(target: EventTarget | null): boolean {
 const addBtn = document.getElementById('menu-add') as HTMLButtonElement;
 addBtn.addEventListener('click', () => {
   openMenuPopup(addBtn, [
+    { label: '👤 FPS Player', onClick: () => addAndSelect(makeFPSPlayer()) },
+    { sep: true },
     { label: 'Cube', onClick: () => addAndSelect(makeCube()) },
     { label: 'Sphere', onClick: () => addAndSelect(makeSphere()) },
     { label: 'Cylinder', onClick: () => addAndSelect(makeCylinder()) },
@@ -296,15 +325,16 @@ function closeFloat(which: 'claude' | 'blender') {
     blenderBtn.classList.remove('active');
   }
 }
-document.getElementById('float-claude-close')?.addEventListener('click', (e) => {
+// Event delegation on document so we don't depend on when the buttons get
+// added to the DOM, and so clicks on the inner ✕ text still match the button.
+document.addEventListener('click', (e) => {
+  const target = (e.target as HTMLElement | null)?.closest(
+    '#float-claude-close, #float-blender-close',
+  ) as HTMLElement | null;
+  if (!target) return;
   e.preventDefault();
   e.stopPropagation();
-  closeFloat('claude');
-});
-document.getElementById('float-blender-close')?.addEventListener('click', (e) => {
-  e.preventDefault();
-  e.stopPropagation();
-  closeFloat('blender');
+  closeFloat(target.id === 'float-claude-close' ? 'claude' : 'blender');
 });
 // Escape closes any open floating panel.
 window.addEventListener('keydown', (e) => {
