@@ -4,6 +4,8 @@
 
 type State =
   | { kind: 'hidden' }
+  | { kind: 'checking' }
+  | { kind: 'up-to-date' }
   | { kind: 'downloading'; version?: string; percent: number }
   | { kind: 'ready'; version: string }
   | { kind: 'error'; message: string };
@@ -25,9 +27,22 @@ export class UpdateToast {
     window.hairy.updater.onEvent((e) => {
       switch (e.type) {
         case 'checking':
-        case 'update-not-available':
+          // Only surface the "Checking…" toast if a manual check kicked us off
+          // (i.e. we're not already in a steady state). Auto-poll noise stays hidden.
+          if (this.state.kind === 'checking') break;
           if (this.state.kind === 'hidden') break;
-          this.setState({ kind: 'hidden' });
+          this.setState({ kind: 'checking' });
+          break;
+        case 'update-not-available':
+          if (this.state.kind === 'checking') {
+            this.setState({ kind: 'up-to-date' });
+            // Auto-dismiss after a moment so it doesn't clutter the viewport.
+            setTimeout(() => {
+              if (this.state.kind === 'up-to-date') this.setState({ kind: 'hidden' });
+            }, 3500);
+          } else if (this.state.kind !== 'hidden') {
+            this.setState({ kind: 'hidden' });
+          }
           break;
         case 'update-available':
           this.setState({ kind: 'downloading', version: e.version, percent: 0 });
@@ -51,6 +66,11 @@ export class UpdateToast {
     });
   }
 
+  /** Called by Help → Check for updates so the toast is primed. */
+  beginManualCheck() {
+    this.setState({ kind: 'checking' });
+  }
+
   private setState(s: State) {
     this.state = s;
     this.render();
@@ -63,7 +83,17 @@ export class UpdateToast {
       return;
     }
     this.root.hidden = false;
-    if (s.kind === 'downloading') {
+    if (s.kind === 'checking') {
+      this.body.innerHTML = `
+        <div class="update-toast-head">Checking for updates…</div>
+        <div class="update-toast-sub">Talking to GitHub Releases.</div>
+      `;
+    } else if (s.kind === 'up-to-date') {
+      this.body.innerHTML = `
+        <div class="update-toast-head">You're up to date</div>
+        <div class="update-toast-sub">Running the latest HairyEngine.</div>
+      `;
+    } else if (s.kind === 'downloading') {
       this.body.innerHTML = `
         <div class="update-toast-head">Downloading v${s.version ?? ''}…</div>
         <div class="update-toast-bar"><div style="width:${Math.round(s.percent)}%"></div></div>

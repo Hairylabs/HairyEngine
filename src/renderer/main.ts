@@ -112,7 +112,40 @@ project.onChange((s) => {
 window.hairy.window.setTitle(`HairyEngine — ${project.getState().fileName}`);
 
 new DropZone(viewportEl, scene, project, history, (msg) => status.setStatus(msg));
-new UpdateToast(document.body);
+const updateToast = new UpdateToast(document.body);
+
+// Help menu — manual update check, project repo link, version.
+const helpBtn = document.getElementById('menu-help') as HTMLButtonElement;
+helpBtn.addEventListener('click', () => {
+  openMenuPopup(helpBtn, [
+    {
+      label: `Check for updates  (v${window.hairy.version})`,
+      onClick: async () => {
+        updateToast.beginManualCheck();
+        const r = await window.hairy.updater.check();
+        if (!r.ok) {
+          status.setStatus(`Update check: ${r.error}`);
+        }
+      },
+    },
+    { sep: true },
+    {
+      label: 'Open repo on GitHub',
+      onClick: () => {
+        window.open('https://github.com/Hairylabs/HairyEngine', '_blank');
+      },
+    },
+    {
+      label: 'Open Releases page',
+      onClick: () => {
+        window.open(
+          'https://github.com/Hairylabs/HairyEngine/releases',
+          '_blank',
+        );
+      },
+    },
+  ]);
+});
 
 // Console panel + bottom-tab switching + collapse toggle
 const consoleEl = document.getElementById('console-body') as HTMLElement;
