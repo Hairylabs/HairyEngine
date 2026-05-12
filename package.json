@@ -78,7 +78,7 @@
         "provider": "github",
         "owner": "Hairylabs",
         "repo": "HairyEngine",
-        "private": true,
+        "private": false,
         "releaseType": "release"
       }
     ]
