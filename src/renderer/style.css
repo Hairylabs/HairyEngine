@@ -728,6 +728,10 @@ button:hover { background: #25253a; }
   flex-direction: column;
   overflow: hidden;
 }
+/* `display: flex` above outranks the user-agent's `[hidden] { display: none }`
+   so we have to redeclare it at higher specificity. Without this rule the
+   close button + initial hidden state silently don't work. */
+.float-panel[hidden] { display: none; }
 #float-claude { left: 250px; }
 #float-blender { left: 690px; }
 .float-panel-head {
