@@ -49,19 +49,13 @@ import {
   snapToGrid,
   duplicateAlongAxis,
   scatter,
-  extrudeAlong,
 } from './engine/EditTools';
 import { Multiplayer } from './engine/Multiplayer';
 import { PonksDrawer } from './ui/PonksDrawer';
-import { FaceExtrude } from './engine/FaceExtrude';
 import { TopDownView } from './engine/TopDownView';
-import {
-  extrudePoly,
-  extrudePath,
-  warpMesh,
-  latticeDeform,
-  editPivot,
-} from './engine/ModelingTools';
+// (FaceExtrude + ModelingTools removed in 0.0.34 — Godot-shape pivot:
+//  authoring goes back to Blender, the engine assembles/scripts/plays.
+//  The source files stay in the repo, just no UI binding.)
 import { buildPaintballArena, makePaintGun, makePaintPlayer, makePaintTurret } from './engine/Paintball';
 import { promptModal, confirmModal } from './ui/Dialog';
 import { installCrashHelper, getStashedCrashSnapshot, clearStashedCrash } from './engine/CrashHelper';
@@ -295,38 +289,8 @@ document.getElementById('levels-delete')?.addEventListener('click', async () => 
 document.getElementById('levels-help')?.addEventListener('click', () => {
   showGuide('levels', true);
 });
-// Declared up-front so the scene selection listener below can poll its
-// isActive() without forward-ref ordering issues.
-// eslint-disable-next-line prefer-const
-var faceExtrudeRef: { isActive: () => boolean } | null = null;
-const faceExtrude = new FaceExtrude(canvas, viewport.camera, scene, history);
-faceExtrudeRef = faceExtrude;
-
-// Face mode button (toolbar). Toggle on/off; mutually exclusive with the
-// normal translate/rotate/scale gizmo (we just disable picking when active).
-const faceModeBtn = document.getElementById('face-mode-btn') as HTMLButtonElement;
-faceModeBtn.addEventListener('click', () => {
-  showGuide('face-mode');
-  const next = !faceExtrude.isActive();
-  faceExtrude.setActive(next);
-  status.setStatus(
-    next
-      ? 'Face mode — hover ANY mesh (Box, GLB, anything flat) and drag the cyan arrow'
-      : 'Face mode off',
-  );
-});
-faceExtrude.onChange((on) => {
-  faceModeBtn.classList.toggle('active', on);
-  // Block both: the transform gizmo (don't show arrows on a selected mesh
-  // while in face mode) AND the viewport's auto-pick on click (which would
-  // re-attach the gizmo behind our backs the moment you click a cube's face).
-  viewport.setPickingEnabled(!on);
-  if (on) {
-    viewport.setSelected(null);
-  } else if (scene.selection) {
-    viewport.setSelected(scene.selection);
-  }
-});
+// Face mode + in-engine extrude removed in 0.0.34 (Godot-shape pivot).
+const faceExtrudeRef: { isActive: () => boolean } = { isActive: () => false };
 
 // Wireframe / mesh mode — Blender-style cycling shading modes:
 //   0  SOLID       — normal materials, no wires
@@ -488,13 +452,7 @@ window.addEventListener('keydown', (e) => {
     !e.metaKey &&
     !isEditableTarget(e.target)
   ) {
-    // Existing F = focus selected; only intercept when in shift+f? Actually
-    // 'f' is already focus; switch to a dedicated combo to avoid stomping.
-    // Use Shift+F for face mode.
-    if (e.shiftKey) {
-      e.preventDefault();
-      faceExtrude.setActive(!faceExtrude.isActive());
-    }
+    // (Shift+F face-mode hotkey removed in 0.0.34 along with the tool.)
   }
 });
 
@@ -900,78 +858,8 @@ document.getElementById('sel-snap')?.addEventListener('click', () => {
     console.error('[sel-snap]', err);
   }
 });
-function doExtrude(axis: 'x' | 'y' | 'z') {
-  try {
-    const ok = extrudeAlong(scene, history, axis, 1);
-    status.setStatus(
-      ok
-        ? `Extruded +1m on ${axis.toUpperCase()}`
-        : 'Select a mesh first',
-    );
-  } catch (err) {
-    console.error('[extrude]', err);
-    status.setStatus(`Extrude failed: ${(err as Error).message}`);
-  }
-}
-document.getElementById('sel-extrude-x')?.addEventListener('click', () => doExtrude('x'));
-document.getElementById('sel-extrude-y')?.addEventListener('click', () => doExtrude('y'));
-document.getElementById('sel-extrude-z')?.addEventListener('click', () => doExtrude('z'));
-
-// Chamfer / bevel — replaces the selected mesh's BoxGeometry (or already-
-// chamfered RoundedBoxGeometry) with a RoundedBoxGeometry of larger radius.
-// Each click adds +5cm bevel, reset returns to sharp box. We stash the
-// "logical" size on userData so repeated chamfers don't lose accuracy
-// (RoundedBoxGeometry's parameters object doesn't survive shrink/grow well).
-async function doChamfer(delta: number) {
-  const sel = scene.selection;
-  if (!sel || !(sel as THREE.Mesh).isMesh) {
-    status.setStatus('Select a Box mesh first');
-    return;
-  }
-  const mesh = sel as THREE.Mesh;
-  const { RoundedBoxGeometry } = await import(
-    'three/addons/geometries/RoundedBoxGeometry.js'
-  );
-  const geom = mesh.geometry as THREE.BoxGeometry & {
-    parameters?: { width?: number; height?: number; depth?: number };
-    type?: string;
-  };
-  // Recover (width, height, depth) and current chamfer radius.
-  const cached = mesh.userData.__chamferDims as
-    | { w: number; h: number; d: number }
-    | undefined;
-  const dims = cached ?? {
-    w: geom.parameters?.width ?? 1,
-    h: geom.parameters?.height ?? 1,
-    d: geom.parameters?.depth ?? 1,
-  };
-  const currentRadius = Number(mesh.userData.__chamferRadius ?? 0);
-  const nextRadius = delta < 0 ? 0 : Math.min(
-    Math.min(dims.w, dims.h, dims.d) * 0.49,
-    currentRadius + delta,
-  );
-  mesh.geometry.dispose();
-  if (nextRadius <= 0.001) {
-    mesh.geometry = new THREE.BoxGeometry(dims.w, dims.h, dims.d);
-    delete mesh.userData.__chamferRadius;
-  } else {
-    mesh.geometry = new RoundedBoxGeometry(
-      dims.w,
-      dims.h,
-      dims.d,
-      4, // segments per edge
-      nextRadius,
-    );
-    mesh.userData.__chamferRadius = nextRadius;
-  }
-  mesh.userData.__chamferDims = dims;
-  scene.notifyChanged();
-  status.setStatus(
-    nextRadius > 0 ? `Chamfer ${(nextRadius * 100).toFixed(0)}cm` : 'Sharp edges',
-  );
-}
-document.getElementById('sel-chamfer-add')?.addEventListener('click', () => doChamfer(0.05));
-document.getElementById('sel-chamfer-reset')?.addEventListener('click', () => doChamfer(-1));
+// (Per-axis Extrude and Chamfer removed in 0.0.34 — mesh editing happens
+//  in Blender now. Re-import the .glb to update.)
 
 // Drop-to-floor (Unreal "End" key)
 document.getElementById('drop-floor-btn')?.addEventListener('click', () => {
@@ -1035,68 +923,8 @@ topdownBtn.addEventListener('click', () => {
   status.setStatus(next ? 'Top-down split ON — RMB drag pans, wheel zooms, dbl-click frames all' : 'Top-down split OFF');
 });
 
-// --- UE5 modeling tools popup ---------------------------------------------
-const modelingBtn = document.getElementById('modeling-btn') as HTMLButtonElement;
-modelingBtn.addEventListener('click', () => {
-  showGuide('modeling');
-  // Close any existing popup first.
-  document.querySelectorAll('.modeling-popup').forEach((p) => p.remove());
-  const popup = document.createElement('div');
-  popup.className = 'modeling-popup';
-  popup.innerHTML = `
-    <div class="mp-hint">UE5-style modeling — applies to the selected mesh</div>
-    <button data-op="extrude-x">⇄ Extrude Poly +X (1m)</button>
-    <button data-op="extrude-y">↕ Extrude Poly +Y (1m)</button>
-    <button data-op="extrude-z">⇕ Extrude Poly +Z (1m)</button>
-    <div class="mp-sep"></div>
-    <button data-op="extrude-path">≈ Extrude Path (8 along sine)</button>
-    <div class="mp-sep"></div>
-    <button data-op="warp">∿ Warp (bend on Y)</button>
-    <button data-op="lattice">▦ Lattice (taper/twist/bulge)</button>
-    <div class="mp-sep"></div>
-    <button data-op="pivot-center">⊕ Edit Pivot → Center</button>
-    <button data-op="pivot-bottom">⊥ Edit Pivot → Bottom</button>
-  `;
-  const rect = modelingBtn.getBoundingClientRect();
-  popup.style.left = `${rect.left}px`;
-  popup.style.top = `${rect.bottom + 4}px`;
-  document.body.appendChild(popup);
-
-  popup.addEventListener('click', (e) => {
-    const target = (e.target as HTMLElement).closest('button[data-op]') as HTMLButtonElement | null;
-    if (!target) return;
-    const op = target.dataset.op!;
-    try {
-      let ok = false;
-      switch (op) {
-        case 'extrude-x': ok = extrudePoly(scene, history, 'x', 1); break;
-        case 'extrude-y': ok = extrudePoly(scene, history, 'y', 1); break;
-        case 'extrude-z': ok = extrudePoly(scene, history, 'z', 1); break;
-        case 'extrude-path': ok = extrudePath(scene, history); break;
-        case 'warp': ok = warpMesh(scene, history); break;
-        case 'lattice': ok = latticeDeform(scene, history); break;
-        case 'pivot-center': ok = editPivot(scene, history, 'center'); break;
-        case 'pivot-bottom': ok = editPivot(scene, history, 'bottom'); break;
-      }
-      status.setStatus(ok ? `Applied: ${target.textContent?.trim()}` : 'Select a mesh first');
-    } catch (err) {
-      console.error('[modeling]', err);
-      status.setStatus(`Modeling op failed: ${(err as Error).message}`);
-    }
-    popup.remove();
-  });
-
-  // Close on outside click
-  setTimeout(() => {
-    const onAway = (ev: MouseEvent) => {
-      if (!popup.contains(ev.target as Node)) {
-        popup.remove();
-        document.removeEventListener('click', onAway);
-      }
-    };
-    document.addEventListener('click', onAway);
-  }, 0);
-});
+// (UE5 modeling tools popup removed in 0.0.34. Author meshes in Blender,
+//  drop the .glb/.fbx in the Asset panel.)
 
 // --- Paintball arena bootstrap --------------------------------------------
 const paintballBtn = document.getElementById('paintball-btn') as HTMLButtonElement;

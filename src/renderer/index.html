@@ -58,8 +58,7 @@
               <button data-mode="translate" class="gizmo-btn active" title="Translate (W)">⇄</button>
               <button data-mode="rotate" class="gizmo-btn" title="Rotate (E)">⟳</button>
               <button data-mode="scale" class="gizmo-btn" title="Scale (R)">⇲</button>
-              <button id="face-mode-btn" class="gizmo-btn" title="Face mode — drag a face to extrude (works on Box-shaped primitives)">◫</button>
-              <button id="wireframe-btn" class="gizmo-btn" title="Wireframe / triangle view — toggle mesh edges (Mesh mode)">◊</button>
+              <button id="wireframe-btn" class="gizmo-btn" title="Wireframe overlay — cycle Solid/+Wires/X-Ray/Wire-only/Edit-mode">◊</button>
               <div class="toolbar-sep"></div>
               <button id="grid-snap-btn" class="gizmo-btn" title="Snap to grid (level building mode)">⊞</button>
               <button id="grid-size-btn" class="gizmo-btn gizmo-btn-text" title="Click to cycle grid size">1m</button>
@@ -70,7 +69,6 @@
               <button id="scatter-btn" class="gizmo-btn" title="Scatter 8 random copies in a 4m radius (foliage)">❀</button>
               <div class="toolbar-sep"></div>
               <button id="topdown-btn" class="gizmo-btn" title="Top-down split view (Hammer-style 2D viewport)">▤</button>
-              <button id="modeling-btn" class="gizmo-btn" title="UE5-style modeling tools (Extrude Poly, Warp, Lattice, Edit Pivot)">⚙</button>
               <button id="paintball-btn" class="gizmo-btn" title="Build paintball arena (one-click playable map)">🎯</button>
               <button id="mixamo-btn" class="gizmo-btn" title="Animation library — apply Mixamo clips to selected character">💃</button>
               <div class="toolbar-sep"></div>
@@ -89,15 +87,6 @@
               <button id="sel-reset-scale" class="sel-btn" title="Reset scale to 1,1,1">▣ Reset Scale</button>
               <button id="sel-drop" class="sel-btn" title="Drop to floor">⤓ Drop</button>
               <button id="sel-snap" class="sel-btn" title="Snap to grid (Shift+G)">⊞ Snap</button>
-              <div class="sel-divider"></div>
-              <span class="sel-label-small">Extrude:</span>
-              <button id="sel-extrude-x" class="sel-btn" title="Extrude +1m along X (red axis)">↔ X</button>
-              <button id="sel-extrude-y" class="sel-btn" title="Extrude +1m along Y (up)">↕ Y</button>
-              <button id="sel-extrude-z" class="sel-btn" title="Extrude +1m along Z (blue axis)">⇕ Z</button>
-              <div class="sel-divider"></div>
-              <span class="sel-label-small">Chamfer:</span>
-              <button id="sel-chamfer-add" class="sel-btn" title="Bevel edges by +5cm (rounded box). Click multiple times to bevel more.">◐ +</button>
-              <button id="sel-chamfer-reset" class="sel-btn" title="Reset to sharp box edges">◑ Off</button>
               <div class="sel-divider" id="sel-anim-divider" hidden></div>
               <span class="sel-label-small" id="sel-anim-label" hidden>Animations:</span>
               <div id="sel-anim-buttons" class="sel-anim-buttons"></div>

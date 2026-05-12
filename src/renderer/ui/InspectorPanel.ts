@@ -72,136 +72,25 @@ export class InspectorPanel {
       }
     }
 
-    // Polycount / Decimate — only show on meshes with real geometry.
+    // Read-only polycount display (no decimate slider — mesh edits go in Blender).
     if (mesh.isMesh && mesh.geometry) {
-      this.renderPolycountSection(mesh);
+      const idx = mesh.geometry.index;
+      const pos = mesh.geometry.attributes.position;
+      const tris = idx ? Math.round(idx.count / 3) : (pos ? Math.round(pos.count / 3) : 0);
+      const verts = pos ? pos.count : 0;
+      this.section('Polycount', (body) => {
+        const stats = document.createElement('div');
+        stats.style.fontFamily = 'ui-monospace, monospace';
+        stats.style.fontSize = '11px';
+        stats.style.color = 'var(--muted)';
+        stats.style.padding = '4px 8px 10px';
+        stats.textContent = `${tris.toLocaleString()} triangles · ${verts.toLocaleString()} vertices`;
+        body.appendChild(stats);
+      });
     }
   }
 
-  private renderPolycountSection(mesh: THREE.Mesh) {
-    this.section('Polycount', (body) => {
-      const triCount = () => {
-        const idx = mesh.geometry.index;
-        const pos = mesh.geometry.attributes.position;
-        return idx ? Math.round(idx.count / 3) : (pos ? Math.round(pos.count / 3) : 0);
-      };
-      const vertCount = () => mesh.geometry.attributes.position?.count ?? 0;
-
-      const stats = document.createElement('div');
-      stats.style.fontFamily = 'ui-monospace, monospace';
-      stats.style.fontSize = '11px';
-      stats.style.color = 'var(--muted)';
-      stats.style.padding = '4px 8px 8px';
-
-      const row = document.createElement('div');
-      row.style.padding = '0 8px 8px';
-
-      const label = document.createElement('div');
-      label.style.fontSize = '11px';
-      label.style.color = 'var(--text)';
-      label.style.marginBottom = '4px';
-      row.appendChild(label);
-
-      const controls = document.createElement('div');
-      controls.style.display = 'flex';
-      controls.style.gap = '6px';
-      controls.style.alignItems = 'center';
-
-      // Number input for target triangle count.
-      const numInput = document.createElement('input');
-      numInput.type = 'number';
-      numInput.min = '8';
-      numInput.style.width = '90px';
-      numInput.style.padding = '4px 6px';
-      numInput.style.background = 'rgba(0,0,0,0.4)';
-      numInput.style.border = '1px solid var(--border)';
-      numInput.style.borderRadius = '3px';
-      numInput.style.color = 'var(--text)';
-      numInput.style.fontFamily = 'ui-monospace, monospace';
-      numInput.style.fontSize = '11px';
-      const unit = document.createElement('span');
-      unit.textContent = 'tris';
-      unit.style.fontSize = '10px';
-      unit.style.color = 'var(--muted)';
-      // Slider mirrors the number — 5% to 100% of current triangle count.
-      const slider = document.createElement('input');
-      slider.type = 'range';
-      slider.min = '5';
-      slider.max = '100';
-      slider.step = '1';
-      slider.style.flex = '1';
-
-      const refresh = () => {
-        const tris = triCount();
-        stats.textContent = `Current: ${tris.toLocaleString()} triangles · ${vertCount().toLocaleString()} vertices`;
-        label.innerHTML = `Decimate target — type triangle count or drag slider:`;
-        numInput.value = String(tris);
-        numInput.max = String(tris);
-        slider.value = '100';
-      };
-      refresh();
-
-      const onSlider = () => {
-        const pct = Number(slider.value);
-        const target = Math.max(8, Math.round((pct / 100) * triCount()));
-        numInput.value = String(target);
-      };
-      const onInput = () => {
-        const target = Math.max(8, Math.min(triCount(), Number(numInput.value) || triCount()));
-        const pct = Math.round((target / triCount()) * 100);
-        slider.value = String(pct);
-      };
-      slider.addEventListener('input', onSlider);
-      numInput.addEventListener('input', onInput);
-
-      controls.appendChild(numInput);
-      controls.appendChild(unit);
-      controls.appendChild(slider);
-      row.appendChild(controls);
-
-      const btnRow = document.createElement('div');
-      btnRow.style.display = 'flex';
-      btnRow.style.gap = '6px';
-      btnRow.style.marginTop = '8px';
-
-      const applyBtn = document.createElement('button');
-      applyBtn.textContent = 'Apply';
-      applyBtn.className = 'inspector-add-btn';
-      applyBtn.style.flex = '1';
-      applyBtn.addEventListener('click', async () => {
-        const target = Math.max(8, Number(numInput.value) || 0);
-        const tris = triCount();
-        if (target >= tris) return;
-        const ratio = target / tris;
-        applyBtn.textContent = 'Decimating…';
-        applyBtn.disabled = true;
-        try {
-          const { decimateGeometry, snapshotGeometry, restoreGeometry } = await import('../engine/MeshOps');
-          const before = snapshotGeometry(mesh.geometry);
-          const next = await decimateGeometry(mesh.geometry, ratio);
-          mesh.geometry.dispose();
-          mesh.geometry = next;
-          const after = snapshotGeometry(mesh.geometry);
-          this.history.record({
-            label: `Decimate to ${target} tris`,
-            do: () => restoreGeometry(mesh, after),
-            undo: () => restoreGeometry(mesh, before),
-          });
-          this.scene.notifyChanged();
-          refresh();
-        } catch (err) {
-          console.error('[Inspector] decimate failed:', err);
-        }
-        applyBtn.textContent = 'Apply';
-        applyBtn.disabled = false;
-      });
-      btnRow.appendChild(applyBtn);
-
-      body.appendChild(stats);
-      body.appendChild(row);
-      body.appendChild(btnRow);
-    });
-  }
+  // (Decimate slider removed in 0.0.34 — mesh edits live in Blender.)
 
   tick() {
     // The user can drag in the viewport (once TransformControls lands) — refresh
