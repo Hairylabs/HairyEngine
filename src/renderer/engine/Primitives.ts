@@ -114,6 +114,84 @@ export function makePhysicsSphere() {
 // and a default Mixamo-friendly position. Mirrors Unity's Starter Asset
 // First-Person template that lets non-coders go from empty scene to playable
 // character in a single click.
+// --- Level-building primitives (Sprint 5: ProBuilder-style blockout) -------
+//
+// These are box-based shapes sized in meters and positioned so their bottom
+// rests on y = floor. Combined with grid snap in the viewport gizmo, they
+// give the artist the Hammer / CubeGrid "drop walls + floors on a grid"
+// workflow without having to author meshes in Blender.
+
+export function makeWall() {
+  const m = mesh(new THREE.BoxGeometry(4, 3, 0.2), 'Wall');
+  m.position.set(0, 1.5, 0);
+  return m;
+}
+
+export function makeFloor() {
+  const m = mesh(new THREE.BoxGeometry(8, 0.2, 8), 'Floor');
+  m.position.set(0, 0.1, 0);
+  return m;
+}
+
+export function makeRamp() {
+  // Right-triangular prism: 4m long × 2m wide × 1m tall, sloping from y=0 at
+  // the front edge (z=+1) to y=1 at the back edge (z=-1). Faces:
+  //   bottom (y=0 quad), top (sloped quad), back vertical (z=-1 quad),
+  //   left/right triangles.
+  const tris: number[] = [];
+  const v = (x: number, y: number, z: number) => tris.push(x, y, z);
+  // bottom
+  v(-2, 0, -1); v(2, 0, -1); v(2, 0, 1);
+  v(-2, 0, -1); v(2, 0, 1); v(-2, 0, 1);
+  // sloped top (front-bottom → front-bottom-other-end → back-top)
+  v(-2, 0, 1); v(2, 0, 1); v(2, 1, -1);
+  v(-2, 0, 1); v(2, 1, -1); v(-2, 1, -1);
+  // back vertical
+  v(-2, 0, -1); v(-2, 1, -1); v(2, 1, -1);
+  v(-2, 0, -1); v(2, 1, -1); v(2, 0, -1);
+  // right side triangle (x = +2)
+  v(2, 0, -1); v(2, 1, -1); v(2, 0, 1);
+  // left side triangle (x = -2)
+  v(-2, 0, -1); v(-2, 0, 1); v(-2, 1, -1);
+  const geom = new THREE.BufferGeometry();
+  geom.setAttribute('position', new THREE.Float32BufferAttribute(tris, 3));
+  geom.computeVertexNormals();
+  const ramp = new THREE.Mesh(geom, standardMaterial());
+  ramp.name = 'Ramp';
+  ramp.castShadow = true;
+  ramp.receiveShadow = true;
+  return ramp;
+}
+
+export function makeStairs() {
+  // A 4-step staircase, each step 0.5m × 1m × 0.3m. Visually clean for blockout.
+  const group = new THREE.Group();
+  group.name = 'Stairs';
+  for (let i = 0; i < 4; i++) {
+    const step = mesh(new THREE.BoxGeometry(2, 0.3, 0.5), `Step${i}`);
+    step.position.set(0, 0.15 + i * 0.3, -i * 0.5);
+    group.add(step);
+  }
+  return group;
+}
+
+// Empty marker — useful for spawn points, capture flags, anything gameplay
+// wants to reference by name. Renders a small wireframe diamond so it's
+// visible in the editor; the wireframe is hidden in Play Mode (userData flag).
+export function makeSpawnPoint() {
+  const group = new THREE.Group();
+  group.name = 'SpawnPoint';
+  group.position.set(0, 0.5, 0);
+  const helper = new THREE.Mesh(
+    new THREE.OctahedronGeometry(0.4),
+    new THREE.MeshBasicMaterial({ color: 0x4cf8c5, wireframe: true }),
+  );
+  helper.userData.isSpawnHelper = true;
+  helper.userData.deletable = false;
+  group.add(helper);
+  return group;
+}
+
 export function makeFPSPlayer() {
   const group = new THREE.Group();
   group.name = 'Player';

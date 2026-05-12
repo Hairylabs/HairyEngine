@@ -34,7 +34,13 @@ import {
   makePhysicsCube,
   makePhysicsSphere,
   makeFPSPlayer,
+  makeWall,
+  makeFloor,
+  makeRamp,
+  makeStairs,
+  makeSpawnPoint,
 } from './engine/Primitives';
+import { applyBoolean } from './engine/Booleans';
 
 const canvas = document.getElementById('canvas-3d') as HTMLCanvasElement;
 const viewportEl = canvas.parentElement as HTMLElement;
@@ -231,6 +237,53 @@ viewport.onGizmoModeChanged((mode) => {
   toolbarBtns.forEach((b) => b.classList.toggle('active', b.dataset.mode === mode));
 });
 
+// Grid snap toggle — Hammer/ProBuilder-style level-builder mode.
+const gridSnapBtn = document.getElementById('grid-snap-btn') as HTMLButtonElement;
+gridSnapBtn.addEventListener('click', () => {
+  const on = !viewport.gizmo.isAlwaysSnap();
+  viewport.gizmo.setAlwaysSnap(on, 1.0);
+  gridSnapBtn.classList.toggle('active', on);
+  status.setStatus(on ? 'Grid snap ON (1m steps)' : 'Grid snap OFF');
+});
+
+// Boolean subtract — first click marks the selection as "cutter", second
+// click on a target mesh runs the cut. Esc to cancel.
+let pendingCutter: THREE.Mesh | null = null;
+const subtractBtn = document.getElementById('subtract-btn') as HTMLButtonElement;
+subtractBtn.addEventListener('click', () => {
+  const sel = scene.selection;
+  if (!sel || !(sel as THREE.Mesh).isMesh) {
+    status.setStatus('Select a mesh to use as the cutter first (the doorway shape)');
+    return;
+  }
+  pendingCutter = sel as THREE.Mesh;
+  subtractBtn.classList.add('active');
+  status.setStatus(`Subtract: now click the WALL to cut "${pendingCutter.name}" out of`);
+});
+
+scene.onSelectionChanged((obj) => {
+  if (!pendingCutter) return;
+  if (!obj || obj === pendingCutter) return;
+  if (!(obj as THREE.Mesh).isMesh) {
+    status.setStatus('Subtract target must be a mesh — pick a wall or floor');
+    return;
+  }
+  try {
+    const result = applyBoolean(obj as THREE.Mesh, pendingCutter, 'subtract');
+    result.userData = { ...(obj as THREE.Mesh).userData };
+    scene.addInternal(result);
+    scene.removeInternal(obj);
+    scene.removeInternal(pendingCutter);
+    history.clear(); // mixing CSG output with the undo stack would be messy
+    scene.select(result);
+    status.setStatus(`Cut "${pendingCutter.name}" out of "${obj.name}"`);
+  } catch (err) {
+    status.setStatus(`Subtract failed: ${(err as Error).message}`);
+  }
+  pendingCutter = null;
+  subtractBtn.classList.remove('active');
+});
+
 viewport.start((_dt, fps) => {
   status.setFps(fps);
   inspector.tick();
@@ -288,6 +341,12 @@ const addBtn = document.getElementById('menu-add') as HTMLButtonElement;
 addBtn.addEventListener('click', () => {
   openMenuPopup(addBtn, [
     { label: '👤 FPS Player', onClick: () => addAndSelect(makeFPSPlayer()) },
+    { label: '◆ Spawn Point', onClick: () => addAndSelect(makeSpawnPoint()) },
+    { sep: true },
+    { label: '▮ Wall', onClick: () => addAndSelect(makeWall()) },
+    { label: '▭ Floor', onClick: () => addAndSelect(makeFloor()) },
+    { label: '◢ Ramp', onClick: () => addAndSelect(makeRamp()) },
+    { label: '▤ Stairs', onClick: () => addAndSelect(makeStairs()) },
     { sep: true },
     { label: 'Cube', onClick: () => addAndSelect(makeCube()) },
     { label: 'Sphere', onClick: () => addAndSelect(makeSphere()) },

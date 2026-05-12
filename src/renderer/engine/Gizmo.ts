@@ -68,7 +68,7 @@ export class Gizmo {
 
   setSnapping(enabled: boolean) {
     if (enabled) {
-      this.controls.setTranslationSnap(0.25);
+      this.controls.setTranslationSnap(this.gridSize);
       this.controls.setRotationSnap(THREE.MathUtils.degToRad(15));
       this.controls.setScaleSnap(0.1);
     } else {
@@ -77,6 +77,20 @@ export class Gizmo {
       this.controls.setScaleSnap(null);
     }
   }
+
+  /** Toggle between snap-always-on (level builder mode) and snap-on-Ctrl. */
+  setAlwaysSnap(on: boolean, gridSize = 1.0) {
+    this.gridSize = gridSize;
+    this.alwaysSnap = on;
+    this.setSnapping(on);
+  }
+
+  isAlwaysSnap(): boolean {
+    return this.alwaysSnap;
+  }
+
+  private gridSize = 0.25;
+  private alwaysSnap = false;
 
   private bindHotkeys() {
     window.addEventListener('keydown', (e) => {
@@ -96,6 +110,9 @@ export class Gizmo {
       if (e.ctrlKey || e.metaKey) this.setSnapping(true);
     });
     window.addEventListener('keyup', (e) => {
+      // When "always snap" is on for blockout work, Ctrl-release shouldn't
+      // disable it. Otherwise Ctrl is the temporary snap modifier.
+      if (this.alwaysSnap) return;
       if (!e.ctrlKey && !e.metaKey) this.setSnapping(false);
     });
   }
