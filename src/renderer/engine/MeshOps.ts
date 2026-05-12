@@ -251,6 +251,41 @@ export function snapshotGeometry(geom: THREE.BufferGeometry): GeomSnapshot {
   return { positions, indices };
 }
 
+/** Count triangles in a BufferGeometry (indexed or not). */
+export function triangleCount(geom: THREE.BufferGeometry): number {
+  if (geom.index) return geom.index.count / 3;
+  const pos = geom.attributes.position;
+  return pos ? pos.count / 3 : 0;
+}
+
+/** Best-effort mesh decimation. Uses three/addons/SimplifyModifier which
+ *  runs an edge-collapse Quadric Error algorithm. Returns a new geometry
+ *  with `targetRatio` (0..1) of the original triangles. The modifier is
+ *  imported lazily so the bundle stays small for users who never decimate. */
+export async function decimateGeometry(
+  geom: THREE.BufferGeometry,
+  targetRatio: number,
+): Promise<THREE.BufferGeometry> {
+  const ratio = Math.max(0.05, Math.min(0.99, targetRatio));
+  const triCount = triangleCount(geom);
+  const targetTris = Math.max(8, Math.floor(triCount * ratio));
+  const trianglesToRemove = Math.max(0, triCount - targetTris);
+  const { SimplifyModifier } = await import('three/addons/modifiers/SimplifyModifier.js');
+  const mod = new SimplifyModifier();
+  // SimplifyModifier takes a vertex count, not a face count. The ratio of
+  // vertices to remove approximates the ratio of faces to keep for closed
+  // meshes — close enough for an "Auto Decimate" slider.
+  const vertCount = geom.attributes.position.count;
+  const targetVerts = Math.max(4, Math.floor(vertCount * ratio));
+  const vertsToRemove = vertCount - targetVerts;
+  try {
+    return mod.modify(geom, vertsToRemove);
+  } catch (err) {
+    console.warn('[decimate] SimplifyModifier failed, returning original:', err, { triCount, targetTris, trianglesToRemove });
+    return geom;
+  }
+}
+
 export function restoreGeometry(mesh: THREE.Mesh, snap: GeomSnapshot) {
   const g = new THREE.BufferGeometry();
   g.setAttribute('position', new THREE.Float32BufferAttribute(snap.positions, 3));

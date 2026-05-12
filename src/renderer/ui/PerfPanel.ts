@@ -1,6 +1,26 @@
 import { perf, PerfSnapshot } from '../engine/PerfMonitor';
 import { Scene } from '../engine/Scene';
 
+/** Probe GPU info via WEBGL_debug_renderer_info on a one-shot WebGL context.
+ *  Returns "Unknown" if the extension is unavailable (some browsers / Linux
+ *  drivers block it for fingerprinting reasons). */
+function detectGPU(): { vendor: string; renderer: string } {
+  try {
+    const c = document.createElement('canvas');
+    const gl = (c.getContext('webgl2') ?? c.getContext('webgl')) as WebGLRenderingContext | null;
+    if (!gl) return { vendor: 'no WebGL', renderer: 'no WebGL' };
+    const ext = gl.getExtension('WEBGL_debug_renderer_info');
+    if (!ext) return { vendor: 'unknown', renderer: 'unknown (driver blocked debug info)' };
+    return {
+      vendor: String(gl.getParameter((ext as { UNMASKED_VENDOR_WEBGL: number }).UNMASKED_VENDOR_WEBGL)),
+      renderer: String(gl.getParameter((ext as { UNMASKED_RENDERER_WEBGL: number }).UNMASKED_RENDERER_WEBGL)),
+    };
+  } catch {
+    return { vendor: 'error', renderer: 'error' };
+  }
+}
+const GPU_INFO = detectGPU();
+
 // Performance tab in the bottom panel. Auto-refreshes every 500ms with the
 // current PerfMonitor snapshot. Shows live FPS, frame time p95, slow-frame
 // count, error count, scene mesh/triangle count, and JS heap usage.
@@ -67,6 +87,7 @@ export class PerfPanel {
       </div>
       <div style="padding: 10px 12px; font-size: 11px; font-family: ui-monospace, monospace; color: var(--muted);">
         Scene: ${sceneStats.objects} actors · ${sceneStats.meshes} meshes · ${sceneStats.triangles.toLocaleString()} triangles · ${sceneStats.lights} lights<br>
+        GPU: <span style="color: var(--accent-2);">${escapeHtml(GPU_INFO.renderer)}</span> · vendor: ${escapeHtml(GPU_INFO.vendor)}<br>
         JS heap: ${heap}<br><br>
         <strong style="color: var(--text);">Warning thresholds:</strong>
         <br>· Slow frame: > 50 ms (< 20 fps) — logged once per 30 events
@@ -102,6 +123,12 @@ function countScene(scene: Scene): { objects: number; meshes: number; triangles:
     if ((o as THREE.Light).isLight) lights++;
   });
   return { objects, meshes, triangles, lights };
+}
+
+function escapeHtml(s: string): string {
+  return s.replace(/[&<>"']/g, (c) =>
+    c === '&' ? '&amp;' : c === '<' ? '&lt;' : c === '>' ? '&gt;' : c === '"' ? '&quot;' : '&#39;',
+  );
 }
 
 // Re-import THREE just to satisfy isMesh / isLight type checks above.

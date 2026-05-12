@@ -123,22 +123,89 @@ declare global {
 
 export async function connectWallet(): Promise<Address | null> {
   const eth = window.ethereum;
+  // Electron desktop usually has no window.ethereum (MetaMask is a browser
+  // extension). Fall back to "read-only" mode: ask the user to paste their
+  // PulseChain address; we still read their Ponks via the public RPC.
   if (!eth) {
-    alert('No browser wallet detected. Install MetaMask or another EVM wallet to connect.');
-    return null;
+    const pasted = await promptForAddress();
+    if (!pasted) return null;
+    try {
+      return getAddress(pasted.trim());
+    } catch (err) {
+      console.error('[wallet] address invalid:', err);
+      alert(`That doesn't look like a valid Ethereum/PulseChain address.\n${(err as Error).message}`);
+      return null;
+    }
   }
   try {
+    console.info('[wallet] requesting accounts via window.ethereum…');
     const accounts = (await eth.request({
       method: 'eth_requestAccounts',
     })) as string[];
+    console.info('[wallet] returned accounts:', accounts);
     if (!accounts || accounts.length === 0) return null;
     const address = getAddress(accounts[0]);
-    await ensurePulseChain();
+    try {
+      await ensurePulseChain();
+    } catch (err) {
+      console.warn('[wallet] PulseChain switch failed but address is connected:', err);
+      // Continue anyway — we can still read NFTs via our public RPC.
+    }
     return address;
   } catch (err) {
+    const message = (err as Error).message ?? String(err);
     console.error('[wallet] connect failed:', err);
-    return null;
+    alert(`Wallet connect failed: ${message}\n\nFalling back to read-only mode. Paste your address to view Ponks.`);
+    const pasted = await promptForAddress();
+    if (!pasted) return null;
+    try {
+      return getAddress(pasted.trim());
+    } catch {
+      return null;
+    }
   }
+}
+
+/** Modal that asks the user to paste a 0x… address, returning null on cancel.
+ *  Used when there's no injected wallet (default Electron case) so the user
+ *  can still view their Ponks without installing a browser extension. */
+function promptForAddress(): Promise<string | null> {
+  return new Promise((resolve) => {
+    const backdrop = document.createElement('div');
+    backdrop.className = 'claude-modal-backdrop';
+    backdrop.innerHTML = `
+      <div class="claude-modal">
+        <div class="claude-modal-head">🦊 Read-only Wallet</div>
+        <div class="claude-modal-body">
+          <div style="font-size: 13px; line-height: 1.55;">
+            HairyEngine runs as a desktop app, so MetaMask (a browser extension) isn't available here.
+            <br><br>
+            Paste your <strong>PulseChain address</strong> below to view your Ponks. This is <strong>read-only</strong> — no signing, no transactions, just reading the public chain.
+          </div>
+          <input id="wallet-addr-input" type="text" placeholder="0x..."
+            style="margin-top: 14px; width: 100%; padding: 8px 10px; background: rgba(0,0,0,0.4); border: 1px solid var(--border); border-radius: 4px; color: var(--text); font-family: ui-monospace, monospace; font-size: 12px;">
+          <div style="margin-top: 6px; font-size: 10px; color: var(--muted);">Example: 0x000…dEaD · address must start with 0x and be 42 chars</div>
+        </div>
+        <div class="claude-modal-actions">
+          <button class="claude-btn" id="wallet-cancel">Cancel</button>
+          <button class="claude-btn primary" id="wallet-ok">View Ponks</button>
+        </div>
+      </div>
+    `;
+    document.body.appendChild(backdrop);
+    const input = backdrop.querySelector('#wallet-addr-input') as HTMLInputElement;
+    input.focus();
+    const close = (value: string | null) => {
+      backdrop.remove();
+      resolve(value);
+    };
+    backdrop.querySelector('#wallet-cancel')?.addEventListener('click', () => close(null));
+    backdrop.querySelector('#wallet-ok')?.addEventListener('click', () => close(input.value || null));
+    input.addEventListener('keydown', (e) => {
+      if (e.key === 'Enter') close(input.value || null);
+      if (e.key === 'Escape') close(null);
+    });
+  });
 }
 
 async function ensurePulseChain() {

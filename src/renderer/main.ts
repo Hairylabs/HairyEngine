@@ -301,24 +301,32 @@ faceExtrude.onChange((on) => {
 const WIREFRAME_TAG = '__wireframeOverlay';
 const ORIG_MAT_KEY = '__origMaterial';
 const ORIG_OPACITY_KEY = '__origOpacity';
-type WireMode = 0 | 1 | 2 | 3;
+type WireMode = 0 | 1 | 2 | 3 | 4;
 const WIRE_LABELS: Record<WireMode, string> = {
   0: 'Solid',
   1: 'Solid + wires',
   2: 'X-Ray + wires',
   3: 'Wire-only',
+  4: 'Edit Mode (Blender)',
+};
+const WIRE_COLORS: Record<WireMode, number> = {
+  0: 0x4cf8c5, // unused
+  1: 0x4cf8c5, // cyan
+  2: 0x4cf8c5,
+  3: 0x4cf8c5,
+  4: 0xff9a3a, // Blender's edit-mode orange
 };
 let wireMode: WireMode = 0;
 const wireframeBtn = document.getElementById('wireframe-btn') as HTMLButtonElement;
 
-function addWireframeOverlay(mesh: THREE.Mesh) {
+function addWireframeOverlay(mesh: THREE.Mesh, color = 0x4cf8c5) {
   if (mesh.children.some((c) => c.userData[WIREFRAME_TAG])) return;
   if (!mesh.geometry) return;
   const edges = new THREE.EdgesGeometry(mesh.geometry, 1);
   const lines = new THREE.LineSegments(
     edges,
     new THREE.LineBasicMaterial({
-      color: 0x4cf8c5,
+      color,
       depthTest: false,
       depthWrite: false,
       transparent: true,
@@ -403,11 +411,21 @@ function applyWireMode(mode: WireMode) {
         // Wire-only: render mesh as lines via material.wireframe
         if ('wireframe' in x) x.wireframe = true;
         x.needsUpdate = true;
+      } else if (mode === 4) {
+        // Edit Mode: dim materials so the orange wires pop (Blender style)
+        x.transparent = true;
+        if (x.opacity !== undefined) x.opacity = 0.7;
+        x.needsUpdate = true;
       }
     }
-    // Overlay wires for modes 1 and 2 (mode 3 already uses material.wireframe).
-    if (mode === 1 || mode === 2) addWireframeOverlay(m);
+    // Overlay wires for modes 1, 2, 4. Mode 3 uses material.wireframe.
+    if (mode === 1 || mode === 2 || mode === 4) {
+      addWireframeOverlay(m, WIRE_COLORS[mode]);
+    }
   });
+  // Edit-mode cursor + flag on the viewport.
+  const v = document.getElementById('viewport-host');
+  v?.classList.toggle('is-edit-mode', mode === 4);
 }
 
 wireframeBtn.addEventListener('click', (e) => {
@@ -415,7 +433,7 @@ wireframeBtn.addEventListener('click', (e) => {
   if (e.shiftKey) {
     wireMode = 0;
   } else {
-    wireMode = ((wireMode + 1) % 4) as WireMode;
+    wireMode = ((wireMode + 1) % 5) as WireMode;
   }
   wireframeBtn.classList.toggle('active', wireMode !== 0);
   applyWireMode(wireMode);
@@ -1335,8 +1353,83 @@ function isEditableTarget(target: EventTarget | null): boolean {
   return tag === 'INPUT' || tag === 'TEXTAREA' || target.isContentEditable;
 }
 
-// Menus
+// Resizable panels — drag the vertical handles between left/center/right.
+// Persists widths to localStorage so they survive across sessions.
+const PANEL_W_KEY = 'hairy.panelWidths.v1';
+const appBody = document.querySelector('.app-body') as HTMLElement;
+const handleLeft = document.getElementById('handle-left') as HTMLElement;
+const handleRight = document.getElementById('handle-right') as HTMLElement;
+
+(function restorePanelWidths() {
+  try {
+    const raw = localStorage.getItem(PANEL_W_KEY);
+    if (!raw) return;
+    const w = JSON.parse(raw) as { left?: number; right?: number };
+    if (typeof w.left === 'number') appBody.style.setProperty('--panel-left-w', `${w.left}px`);
+    if (typeof w.right === 'number') appBody.style.setProperty('--panel-right-w', `${w.right}px`);
+  } catch {
+    /* */
+  }
+})();
+
+function persistPanelWidths() {
+  const left = appBody.style.getPropertyValue('--panel-left-w') || '240px';
+  const right = appBody.style.getPropertyValue('--panel-right-w') || '320px';
+  try {
+    localStorage.setItem(PANEL_W_KEY, JSON.stringify({
+      left: parseInt(left), right: parseInt(right),
+    }));
+  } catch {
+    /* */
+  }
+}
+
+function wirePanelHandle(handle: HTMLElement, side: 'left' | 'right') {
+  let dragging = false;
+  let startX = 0;
+  let startW = 0;
+  handle.addEventListener('pointerdown', (e) => {
+    dragging = true;
+    startX = e.clientX;
+    const cur = side === 'left'
+      ? appBody.style.getPropertyValue('--panel-left-w') || '240px'
+      : appBody.style.getPropertyValue('--panel-right-w') || '320px';
+    startW = parseInt(cur);
+    handle.classList.add('dragging');
+    document.body.style.cursor = 'col-resize';
+    handle.setPointerCapture(e.pointerId);
+  });
+  handle.addEventListener('pointermove', (e) => {
+    if (!dragging) return;
+    const delta = e.clientX - startX;
+    // Right handle resizes the right panel by reducing width as you drag right.
+    const sign = side === 'left' ? 1 : -1;
+    const next = Math.max(160, Math.min(window.innerWidth * 0.5, startW + delta * sign));
+    if (side === 'left') {
+      appBody.style.setProperty('--panel-left-w', `${next}px`);
+    } else {
+      appBody.style.setProperty('--panel-right-w', `${next}px`);
+    }
+  });
+  const endDrag = (e: PointerEvent) => {
+    if (!dragging) return;
+    dragging = false;
+    handle.classList.remove('dragging');
+    document.body.style.cursor = '';
+    try { handle.releasePointerCapture(e.pointerId); } catch { /* */ }
+    persistPanelWidths();
+  };
+  handle.addEventListener('pointerup', endDrag);
+  handle.addEventListener('pointercancel', endDrag);
+}
+wirePanelHandle(handleLeft, 'left');
+wirePanelHandle(handleRight, 'right');
+
+// Menus — `+ Add` header button + the new `+` button inside the Scene panel
+// header both open the same actor menu.
 const addBtn = document.getElementById('menu-add') as HTMLButtonElement;
+const sceneAddBtn = document.getElementById('scene-add') as HTMLButtonElement | null;
+sceneAddBtn?.addEventListener('click', () => addBtn.click());
 addBtn.addEventListener('click', () => {
   openMenuPopup(addBtn, [
     { label: '👤 Character (FPS)', onClick: () => addAndSelect(makeFPSPlayer()) },

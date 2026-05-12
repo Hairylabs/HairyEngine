@@ -71,6 +71,105 @@ export class InspectorPanel {
         });
       }
     }
+
+    // Polycount / Decimate — only show on meshes with real geometry.
+    if (mesh.isMesh && mesh.geometry) {
+      this.renderPolycountSection(mesh);
+    }
+  }
+
+  private renderPolycountSection(mesh: THREE.Mesh) {
+    this.section('Polycount', (body) => {
+      const stats = document.createElement('div');
+      stats.style.fontFamily = 'ui-monospace, monospace';
+      stats.style.fontSize = '11px';
+      stats.style.color = 'var(--muted)';
+      stats.style.padding = '4px 8px 10px';
+      const update = () => {
+        const idx = mesh.geometry.index;
+        const pos = mesh.geometry.attributes.position;
+        const triangles = idx ? Math.round(idx.count / 3) : (pos ? Math.round(pos.count / 3) : 0);
+        const vertices = pos ? pos.count : 0;
+        stats.textContent = `${triangles.toLocaleString()} triangles · ${vertices.toLocaleString()} vertices`;
+      };
+      update();
+      body.appendChild(stats);
+
+      // Decimate slider — applies a temporary preview, commit on release.
+      const row = document.createElement('div');
+      row.style.padding = '0 8px 8px';
+      const label = document.createElement('div');
+      label.textContent = 'Decimate to:';
+      label.style.fontSize = '11px';
+      label.style.color = 'var(--text)';
+      label.style.marginBottom = '4px';
+      row.appendChild(label);
+
+      const controls = document.createElement('div');
+      controls.style.display = 'flex';
+      controls.style.gap = '6px';
+      controls.style.alignItems = 'center';
+
+      const slider = document.createElement('input');
+      slider.type = 'range';
+      slider.min = '5';
+      slider.max = '100';
+      slider.value = '100';
+      slider.style.flex = '1';
+      const percent = document.createElement('span');
+      percent.style.fontSize = '11px';
+      percent.style.fontFamily = 'ui-monospace, monospace';
+      percent.style.minWidth = '36px';
+      percent.style.textAlign = 'right';
+      percent.textContent = '100%';
+      slider.addEventListener('input', () => {
+        percent.textContent = `${slider.value}%`;
+      });
+      controls.appendChild(slider);
+      controls.appendChild(percent);
+      row.appendChild(controls);
+
+      const btnRow = document.createElement('div');
+      btnRow.style.display = 'flex';
+      btnRow.style.gap = '6px';
+      btnRow.style.marginTop = '8px';
+
+      const applyBtn = document.createElement('button');
+      applyBtn.textContent = 'Apply';
+      applyBtn.className = 'inspector-add-btn';
+      applyBtn.style.flex = '1';
+      applyBtn.addEventListener('click', async () => {
+        const ratio = Number(slider.value) / 100;
+        if (ratio >= 0.99) return;
+        applyBtn.textContent = 'Decimating…';
+        applyBtn.disabled = true;
+        try {
+          const { decimateGeometry, snapshotGeometry, restoreGeometry } = await import('../engine/MeshOps');
+          const before = snapshotGeometry(mesh.geometry);
+          const next = await decimateGeometry(mesh.geometry, ratio);
+          mesh.geometry.dispose();
+          mesh.geometry = next;
+          const after = snapshotGeometry(mesh.geometry);
+          this.history.record({
+            label: `Decimate to ${slider.value}%`,
+            do: () => restoreGeometry(mesh, after),
+            undo: () => restoreGeometry(mesh, before),
+          });
+          this.scene.notifyChanged();
+          update();
+        } catch (err) {
+          console.error('[Inspector] decimate failed:', err);
+        }
+        applyBtn.textContent = 'Apply';
+        applyBtn.disabled = false;
+        slider.value = '100';
+        percent.textContent = '100%';
+      });
+      btnRow.appendChild(applyBtn);
+
+      row.appendChild(btnRow);
+      body.appendChild(row);
+    });
   }
 
   tick() {
