@@ -136,9 +136,20 @@ export class FaceExtrude {
 
   private onPointerDown = (e: PointerEvent) => {
     if (!this.active || e.button !== 0) return;
-    if (!this.hoverMesh || !this.hoverFace) return;
+    if (!this.hoverMesh || !this.hoverFace) {
+      console.log('[FaceExtrude] click ignored — no hover face');
+      return;
+    }
     e.preventDefault();
     e.stopPropagation();
+    // Capture the pointer so the TransformControls / Viewport picking handlers
+    // can't steal pointermoves / pointerups mid-drag.
+    try {
+      this.canvas.setPointerCapture(e.pointerId);
+    } catch {
+      // older versions ignore
+    }
+    this.dragPointerId = e.pointerId;
     this.dragMesh = this.hoverMesh;
     this.dragFace = this.hoverFace;
     const geom = this.dragMesh.geometry as THREE.BoxGeometry & {
@@ -154,12 +165,28 @@ export class FaceExtrude {
     this.lastCommittedDistance = 0;
     this.dragging = true;
     this.label.hidden = false;
+    console.log('[FaceExtrude] drag start', {
+      mesh: this.dragMesh.name,
+      face: this.dragFace,
+      before: { w: geom.parameters.width, h: geom.parameters.height, d: geom.parameters.depth },
+      startDistance: this.dragStartDistance,
+    });
   };
+
+  private dragPointerId: number | null = null;
 
   private onPointerUp = (e: PointerEvent) => {
     if (!this.dragging) return;
     e.preventDefault();
     e.stopPropagation();
+    try {
+      if (this.dragPointerId !== null) {
+        this.canvas.releasePointerCapture(this.dragPointerId);
+      }
+    } catch {
+      // ignore
+    }
+    this.dragPointerId = null;
     this.commitDrag();
   };
 
@@ -389,7 +416,10 @@ export class FaceExtrude {
   }
 
   private commitDrag() {
-    if (!this.dragMesh || !this.dragSnapshot) return;
+    if (!this.dragMesh || !this.dragSnapshot) {
+      console.log('[FaceExtrude] commit skipped — no drag state');
+      return;
+    }
     const mesh = this.dragMesh;
     const before = this.dragSnapshot;
     const finalGeom = mesh.geometry as THREE.BoxGeometry & {
@@ -401,6 +431,12 @@ export class FaceExtrude {
       depth: finalGeom.parameters.depth,
       position: mesh.position.clone(),
     };
+    console.log('[FaceExtrude] commit', {
+      mesh: mesh.name,
+      face: this.dragFace,
+      before: { w: before.width, h: before.height, d: before.depth, pos: before.position.toArray() },
+      after: { w: after.width, h: after.height, d: after.depth, pos: after.position.toArray() },
+    });
     // If the user didn't actually drag (Blender E-then-Esc footgun fix),
     // bail without polluting the undo stack.
     const moved =

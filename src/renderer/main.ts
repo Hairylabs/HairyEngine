@@ -147,6 +147,48 @@ faceModeBtn.addEventListener('click', () => {
 });
 faceExtrude.onChange((on) => {
   faceModeBtn.classList.toggle('active', on);
+  // While in face mode, hide the transform gizmo so it doesn't intercept
+  // clicks on the cube faces. Re-attach when we leave face mode if there
+  // was a previous selection.
+  if (on) {
+    viewport.setSelected(null);
+  } else if (scene.selection) {
+    viewport.setSelected(scene.selection);
+  }
+});
+
+// Wireframe / mesh mode — toggle wireframe rendering on every mesh in the
+// editable subtree. Useful for seeing triangle topology / verifying that
+// blockout primitives line up.
+let wireframeOn = false;
+const wireframeBtn = document.getElementById('wireframe-btn') as HTMLButtonElement;
+wireframeBtn.addEventListener('click', () => {
+  wireframeOn = !wireframeOn;
+  wireframeBtn.classList.toggle('active', wireframeOn);
+  scene.editable.traverse((o) => {
+    const m = o as THREE.Mesh;
+    if (m.isMesh && m.material) {
+      if (Array.isArray(m.material)) {
+        m.material.forEach((mat) => {
+          (mat as THREE.MeshStandardMaterial).wireframe = wireframeOn;
+        });
+      } else {
+        (m.material as THREE.MeshStandardMaterial).wireframe = wireframeOn;
+      }
+    }
+  });
+  status.setStatus(wireframeOn ? 'Wireframe ON' : 'Wireframe OFF');
+});
+// Re-apply wireframe state to new objects when scene changes (e.g. add a cube
+// while wireframe is on — it should also be wireframe).
+scene.onSceneChanged(() => {
+  if (!wireframeOn) return;
+  scene.editable.traverse((o) => {
+    const m = o as THREE.Mesh;
+    if (m.isMesh && m.material && !Array.isArray(m.material)) {
+      (m.material as THREE.MeshStandardMaterial).wireframe = true;
+    }
+  });
 });
 // F key toggles face mode for power users.
 window.addEventListener('keydown', (e) => {
