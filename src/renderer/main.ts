@@ -550,7 +550,7 @@ const assetsEl = document.getElementById('assets-body') as HTMLElement;
 const perfEl = document.getElementById('perf-body') as HTMLElement;
 const consolePanel = new ConsolePanel(consoleEl);
 const assetPanel = new AssetPanel(assetsEl, scene, history, (msg) => status.setStatus(msg));
-const perfPanel = new PerfPanel(perfEl, scene);
+const perfPanel = new PerfPanel(perfEl, scene, viewport);
 void perfPanel;
 void consolePanel;
 void assetPanel;

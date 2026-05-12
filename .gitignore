@@ -16,3 +16,9 @@ dev-app-update.yml
 *.key
 *.pfx
 server/node_modules/
+
+# Hardhat
+.env
+cache/
+artifacts/
+typechain-types/

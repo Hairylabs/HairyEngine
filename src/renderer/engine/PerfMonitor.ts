@@ -19,6 +19,9 @@ export type PerfSnapshot = {
   errorCount: number;
   uptimeMs: number;
   jsHeapMb?: number;
+  /** V8 heap upper limit reported by Chromium (Mb). The user can't exceed
+   *  this; a browser game tab will be killed if heap usage approaches it. */
+  jsHeapLimitMb?: number;
 };
 
 class PerfMonitorImpl {
@@ -81,9 +84,10 @@ class PerfMonitorImpl {
     const fpsAvg = 1000 / avgMs;
     const fpsMin = 1000 / maxMs;
     // jsHeapSize is a non-standard Chromium API.
-    type PerfMem = { usedJSHeapSize?: number };
+    type PerfMem = { usedJSHeapSize?: number; jsHeapSizeLimit?: number };
     const mem = (performance as unknown as { memory?: PerfMem }).memory;
     const jsHeapMb = mem?.usedJSHeapSize ? mem.usedJSHeapSize / 1024 / 1024 : undefined;
+    const jsHeapLimitMb = mem?.jsHeapSizeLimit ? mem.jsHeapSizeLimit / 1024 / 1024 : undefined;
     return {
       fpsAvg,
       fpsMin,
@@ -94,6 +98,7 @@ class PerfMonitorImpl {
       errorCount: this.errorCount,
       uptimeMs: performance.now() - this.startedAt,
       jsHeapMb,
+      jsHeapLimitMb,
     };
   }
 
