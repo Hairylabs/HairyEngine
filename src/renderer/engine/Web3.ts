@@ -73,6 +73,45 @@ export type Ponk = {
   name?: string;
 };
 
+// Apply a Ponk's image as the diffuse texture of an Object3D's first
+// MeshStandardMaterial. Loads the texture via THREE.TextureLoader and
+// flips Y for correct orientation. Returns true on success.
+export async function applyPonkTexture(
+  url: string,
+  target: import('three').Object3D,
+): Promise<boolean> {
+  const THREE = await import('three');
+  const loader = new THREE.TextureLoader();
+  loader.crossOrigin = 'anonymous';
+  const texture = await new Promise<import('three').Texture | null>((resolve) => {
+    loader.load(
+      url,
+      (t) => resolve(t),
+      undefined,
+      (err) => {
+        console.error('[ponks] texture load failed:', err);
+        resolve(null);
+      },
+    );
+  });
+  if (!texture) return false;
+  texture.colorSpace = THREE.SRGBColorSpace;
+  texture.flipY = true;
+  let applied = false;
+  target.traverse((o) => {
+    const m = o as import('three').Mesh;
+    if (m.isMesh && m.material && !Array.isArray(m.material)) {
+      const mat = m.material as import('three').MeshStandardMaterial;
+      mat.map = texture;
+      // Lighten the base color so the texture reads cleanly
+      if (mat.color) mat.color.set('#ffffff');
+      mat.needsUpdate = true;
+      applied = true;
+    }
+  });
+  return applied;
+}
+
 declare global {
   interface Window {
     ethereum?: {

@@ -41,6 +41,14 @@ import {
   makeSpawnPoint,
 } from './engine/Primitives';
 import { applyBoolean } from './engine/Booleans';
+import {
+  dropToFloor,
+  snapToGrid,
+  duplicateAlongAxis,
+  scatter,
+} from './engine/EditTools';
+import { Multiplayer } from './engine/Multiplayer';
+import { PonksDrawer } from './ui/PonksDrawer';
 
 const canvas = document.getElementById('canvas-3d') as HTMLCanvasElement;
 const viewportEl = canvas.parentElement as HTMLElement;
@@ -119,6 +127,54 @@ window.hairy.window.setTitle(`HairyEngine — ${project.getState().fileName}`);
 
 new DropZone(viewportEl, scene, project, history, (msg) => status.setStatus(msg));
 const updateToast = new UpdateToast(document.body);
+const ponksDrawer = new PonksDrawer(document.body, scene, (m) => status.setStatus(m));
+const multiplayer = new Multiplayer(scene, play);
+
+// About modal — version, repo, manual update check. Lives next to Help so
+// the user has a single "tell me what I'm running and update it" spot.
+const aboutBtn = document.getElementById('menu-about') as HTMLButtonElement;
+aboutBtn.addEventListener('click', () => {
+  const dialog = document.createElement('div');
+  dialog.className = 'claude-modal-backdrop';
+  dialog.innerHTML = `
+    <div class="claude-modal">
+      <div class="claude-modal-head">About HairyEngine</div>
+      <div class="claude-modal-body">
+        <div style="font-size:13px; line-height:1.5;">
+          <div><strong>HairyEngine</strong> v${window.hairy.version}</div>
+          <div style="margin-top:8px; color: var(--muted);">
+            Desktop scene editor for browser games. Three.js + Electron + Rapier + Blender MCP + in-engine Claude chat using your Claude Code subscription.
+          </div>
+          <div style="margin-top:14px;">
+            <button class="claude-btn primary" id="about-update">Check for updates</button>
+            <button class="claude-btn" id="about-repo">Open GitHub</button>
+            <button class="claude-btn" id="about-releases">Releases</button>
+          </div>
+          <div style="margin-top:14px; color: var(--muted); font-size:11px;">
+            Public repo: <code>Hairylabs/HairyEngine</code> · License: MIT (planned)
+          </div>
+        </div>
+      </div>
+      <div class="claude-modal-actions">
+        <button class="claude-btn" id="about-close">Close</button>
+      </div>
+    </div>
+  `;
+  document.body.appendChild(dialog);
+  dialog.querySelector('#about-close')?.addEventListener('click', () => dialog.remove());
+  dialog.querySelector('#about-update')?.addEventListener('click', async () => {
+    updateToast.beginManualCheck();
+    const r = await window.hairy.updater.check();
+    if (!r.ok) status.setStatus(`Update check: ${r.error}`);
+    dialog.remove();
+  });
+  dialog.querySelector('#about-repo')?.addEventListener('click', () => {
+    window.open('https://github.com/Hairylabs/HairyEngine', '_blank');
+  });
+  dialog.querySelector('#about-releases')?.addEventListener('click', () => {
+    window.open('https://github.com/Hairylabs/HairyEngine/releases', '_blank');
+  });
+});
 
 // Help menu — manual update check, project repo link, version.
 const helpBtn = document.getElementById('menu-help') as HTMLButtonElement;
@@ -201,9 +257,8 @@ walletBtn.addEventListener('click', async () => {
     const ponks = await fetchPonks(address);
     status.setStatus(`Loaded ${ponks.length} Ponk${ponks.length === 1 ? '' : 's'}`);
     console.info('Ponks:', ponks);
-    // Future: render thumbnails in a sidebar drawer + let user drag onto a
-    // character's head to apply the NFT image as a texture.
     (window as unknown as { __ponks?: unknown }).__ponks = ponks;
+    ponksDrawer.show(ponks);
   } catch (err) {
     console.error('[ponks] fetch failed:', err);
     status.setStatus('Ponks fetch failed — see Console');
@@ -261,6 +316,53 @@ subtractBtn.addEventListener('click', () => {
   status.setStatus(`Subtract: now click the WALL to cut "${pendingCutter.name}" out of`);
 });
 
+// Drop-to-floor (Unreal "End" key)
+document.getElementById('drop-floor-btn')?.addEventListener('click', () => {
+  const ok = dropToFloor(scene, history);
+  status.setStatus(ok ? 'Dropped to floor' : 'Select an object first');
+});
+
+// Snap selection to nearest grid intersection (post-hoc cleanup)
+window.addEventListener('keydown', (e) => {
+  // Hold Shift+G to snap selection to grid (no conflict with WASD)
+  if (e.shiftKey && e.key.toLowerCase() === 'g' && !isEditableTarget(e.target)) {
+    snapToGrid(scene, history);
+    status.setStatus('Snapped to grid');
+  }
+});
+
+// Duplicate along axis — defaults to 5 copies, 2m apart along X
+document.getElementById('dup-axis-btn')?.addEventListener('click', () => {
+  const n = duplicateAlongAxis(scene, history, 5, 'x', 2);
+  status.setStatus(
+    n > 0 ? `Duplicated ×${n} along +X by 2m` : 'Select an object first',
+  );
+});
+
+// Scatter — 8 random clones in a 4m radius
+document.getElementById('scatter-btn')?.addEventListener('click', () => {
+  const n = scatter(scene, history, 8, 4);
+  status.setStatus(
+    n > 0 ? `Scattered ${n} copies within 4m` : 'Select an object first',
+  );
+});
+
+// Multiplayer connect toggle
+const mpBtn = document.getElementById('multiplayer-btn') as HTMLButtonElement;
+mpBtn.addEventListener('click', async () => {
+  if (multiplayer.isConnected()) {
+    multiplayer.disconnect();
+    return;
+  }
+  status.setStatus('Connecting to multiplayer server…');
+  const r = await multiplayer.connect();
+  if (!r.ok) status.setStatus(`Connect failed: ${r.error}. Run the server: cd server && npm run dev`);
+});
+multiplayer.onStateChange((connected, info) => {
+  mpBtn.classList.toggle('active', connected);
+  if (info) status.setStatus(info);
+});
+
 scene.onSelectionChanged((obj) => {
   if (!pendingCutter) return;
   if (!obj || obj === pendingCutter) return;
@@ -284,9 +386,10 @@ scene.onSelectionChanged((obj) => {
   subtractBtn.classList.remove('active');
 });
 
-viewport.start((_dt, fps) => {
+viewport.start((dt, fps) => {
   status.setFps(fps);
   inspector.tick();
+  multiplayer.tick(dt);
 });
 
 // Hotkeys not handled inside Gizmo/EditorCamera
