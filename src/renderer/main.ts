@@ -192,29 +192,26 @@ window.hairy.window.setTitle(`HairyEngine — ${project.getState().fileName}`);
 new DropZone(viewportEl, scene, project, history, (msg) => status.setStatus(msg));
 const updateToast = new UpdateToast(document.body);
 
-// Wrap the updater's install() so it prompts the user to save first if
-// the current project has unsaved changes. Electron's quitAndInstall kills
-// the app instantly — losing the level would be terrible.
-const _origInstall = window.hairy.updater.install.bind(window.hairy.updater);
-window.hairy.updater.install = async () => {
-  if (project.getState().dirty) {
-    const ans = await confirmModal({
-      title: 'Save before installing?',
-      message: `Your project "${project.getState().fileName}" has unsaved changes. Save before HairyEngine restarts to install the update?`,
-      okLabel: 'Save & install',
-      cancelLabel: 'Discard & install',
-    });
-    if (ans) {
-      const saved = await project.save();
-      if (!saved) {
-        // Cancelled Save As — don't kill the app.
-        status.setStatus('Install cancelled (project not saved)');
-        return;
-      }
+// Register a hook on the toast so the "Restart & install" button prompts
+// the user to save first if the project is dirty. We can't reassign
+// window.hairy.updater.install — contextBridge freezes the exposed object.
+updateToast.setBeforeInstall(async () => {
+  if (!project.getState().dirty) return true;
+  const ans = await confirmModal({
+    title: 'Save before installing?',
+    message: `Your project "${project.getState().fileName}" has unsaved changes. Save before HairyEngine restarts to install the update?`,
+    okLabel: 'Save & install',
+    cancelLabel: 'Discard & install',
+  });
+  if (ans) {
+    const saved = await project.save();
+    if (!saved) {
+      status.setStatus('Install cancelled (project not saved)');
+      return false;
     }
   }
-  await _origInstall();
-};
+  return true;
+});
 const ponksDrawer = new PonksDrawer(document.body, scene, (m) => status.setStatus(m));
 const multiplayer = new Multiplayer(scene, play);
 

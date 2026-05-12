@@ -14,6 +14,13 @@ export class UpdateToast {
   private root: HTMLElement;
   private body: HTMLElement;
   private state: State = { kind: 'hidden' };
+  private beforeInstall: (() => Promise<boolean>) | null = null;
+
+  /** Register a hook that runs before quitAndInstall. Return `false` to
+   *  cancel the install (e.g. user said "Cancel" on the save prompt). */
+  setBeforeInstall(hook: () => Promise<boolean>) {
+    this.beforeInstall = hook;
+  }
 
   constructor(parent: HTMLElement) {
     this.root = document.createElement('div');
@@ -107,7 +114,11 @@ export class UpdateToast {
           <button class="update-toast-btn" id="update-later">Later</button>
         </div>
       `;
-      this.body.querySelector<HTMLButtonElement>('#update-install')?.addEventListener('click', () => {
+      this.body.querySelector<HTMLButtonElement>('#update-install')?.addEventListener('click', async () => {
+        if (this.beforeInstall) {
+          const ok = await this.beforeInstall();
+          if (!ok) return;
+        }
         window.hairy.updater.install();
       });
       this.body.querySelector<HTMLButtonElement>('#update-later')?.addEventListener('click', () => {
