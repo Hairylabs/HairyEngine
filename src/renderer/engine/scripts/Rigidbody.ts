@@ -20,6 +20,7 @@ registerScript({
   type: 'Rigidbody',
   label: 'Rigidbody',
   description: 'Physics body. Box collider sized from the bounding box. Add this to objects you want to fall, bounce, or be hit by raycasts.',
+  category: 'Physics',
   params: [
     { key: 'kind', label: 'Type (dynamic/static/kinematic)', kind: 'string', default: 'dynamic' },
     { key: 'mass', label: 'Mass', kind: 'number', default: 1, step: 0.1 },

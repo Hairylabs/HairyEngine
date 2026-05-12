@@ -6,7 +6,8 @@ import { registerScript, ScriptCtx } from '../Script';
 registerScript({
   type: 'Rotator',
   label: 'Rotator',
-  description: 'Spins the owner each frame.',
+  description: 'Spins the owner each frame around a chosen axis.',
+  category: 'Behavior',
   params: [
     { key: 'speed', label: 'Speed (deg/sec)', kind: 'number', default: 90, step: 5 },
     { key: 'axis', label: 'Axis (x/y/z)', kind: 'string', default: 'y' },

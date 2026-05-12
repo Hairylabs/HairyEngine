@@ -16,3 +16,7 @@ import './AudioListener';
 import './AudioSource';
 import './PaintShooter';
 import './PaintImpact';
+import './LookAt';
+import './LockOn';
+import './AutoShoot';
+import './OrbitTarget';

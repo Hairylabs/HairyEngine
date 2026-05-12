@@ -13,6 +13,7 @@ registerScript({
   type: 'PaintShooter',
   label: 'Paint Shooter',
   description: 'Left-click to fire a paintball with physics. Spawns a Rigidbody sphere that arcs and splatters.',
+  category: 'Paint',
   params: [
     { key: 'rate', label: 'Rate (per second)', kind: 'number', default: 4, step: 1 },
     { key: 'speed', label: 'Muzzle speed (m/s)', kind: 'number', default: 25, step: 1 },

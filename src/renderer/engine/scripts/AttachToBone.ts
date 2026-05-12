@@ -12,6 +12,7 @@ registerScript({
   label: 'Attach to Bone',
   description:
     'Parents this object to a bone (e.g. mixamorig:RightHand). Use for guns in hand, hats on heads, swords on backs.',
+  category: 'Animation',
   params: [
     {
       key: 'characterName',

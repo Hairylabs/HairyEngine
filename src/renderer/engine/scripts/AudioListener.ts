@@ -14,6 +14,7 @@ registerScript({
   label: 'Audio Listener',
   description:
     "Adds an Audio Listener at this object (usually the camera or player). All 3D audio sources are heard relative to this object's position.",
+  category: 'Audio',
   params: [],
   create: (ctx: ScriptCtx): Script => {
     let listener: THREE.AudioListener | null = null;

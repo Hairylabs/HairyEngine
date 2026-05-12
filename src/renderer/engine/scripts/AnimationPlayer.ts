@@ -15,6 +15,7 @@ registerScript({
   type: 'AnimationPlayer',
   label: 'Animation Player',
   description: 'Plays a named animation clip from the GLB. Use "*" to play the first.',
+  category: 'Animation',
   params: [
     { key: 'clip', label: 'Clip name', kind: 'string', default: '*' },
     { key: 'speed', label: 'Speed', kind: 'number', default: 1, step: 0.1 },

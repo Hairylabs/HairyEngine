@@ -21,6 +21,7 @@ registerScript({
   type: 'Shooter',
   label: 'Shooter (Raycast)',
   description: 'Left-click to fire a raycast from the camera. Knocks dynamic bodies.',
+  category: 'Player',
   params: [
     { key: 'range', label: 'Range', kind: 'number', default: 100, step: 5 },
     { key: 'impulse', label: 'Impulse', kind: 'number', default: 12, step: 1 },

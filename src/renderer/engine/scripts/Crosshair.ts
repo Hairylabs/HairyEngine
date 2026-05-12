@@ -10,6 +10,7 @@ registerScript({
   type: 'Crosshair',
   label: 'Crosshair',
   description: 'Adds a small + crosshair to the HUD. Best attached to the player object.',
+  category: 'Player',
   params: [],
   create: (_ctx: ScriptCtx): Script => {
     let el: HTMLElement | null = null;

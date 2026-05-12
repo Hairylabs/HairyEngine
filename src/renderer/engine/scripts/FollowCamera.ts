@@ -9,6 +9,7 @@ registerScript({
   type: 'FollowCamera',
   label: 'Follow Camera',
   description: 'Camera follows a named target object with an offset.',
+  category: 'Camera',
   params: [
     { key: 'target', label: 'Target name', kind: 'string', default: 'Player' },
     { key: 'offsetX', label: 'Offset X', kind: 'number', default: 0, step: 0.5 },

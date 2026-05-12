@@ -19,6 +19,7 @@ registerScript({
   type: 'PaintImpact',
   label: 'Paint Impact',
   description: 'Applies initial velocity and converts a paintball into a splat decal on impact / timeout.',
+  category: 'Paint',
   params: [
     { key: 'splatRadius', label: 'Splat radius', kind: 'number', default: 0.25, step: 0.05 },
   ],

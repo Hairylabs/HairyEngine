@@ -200,17 +200,50 @@ export class InspectorPanel {
   }
 
   private openAddScriptMenu(obj: THREE.Object3D, anchor: HTMLElement) {
-    const items = listScripts().map((def) => ({
-      label: def.label,
-      onClick: () => {
-        addScriptDescriptor(obj, {
-          type: def.type,
-          params: defaultParamsFor(def.params),
+    // Group by category so the menu reads like Unity's Add Component:
+    // each header (Behavior, Camera, Audio, Physics, Paint, Player,
+    // Animation, FX, User) is a separator; under each are the matching
+    // scripts in registration order.
+    const CATEGORY_ORDER = [
+      'Behavior', 'Player', 'Paint', 'Camera',
+      'Physics', 'Animation', 'Audio', 'FX', 'User',
+    ];
+    const defs = listScripts();
+    const byCat = new Map<string, typeof defs>();
+    for (const def of defs) {
+      const cat = (def as { category?: string }).category ?? 'User';
+      const arr = byCat.get(cat) ?? [];
+      arr.push(def);
+      byCat.set(cat, arr);
+    }
+    const items: Array<{ label: string; onClick: () => void } | { sep: true }> = [];
+    let first = true;
+    for (const cat of CATEGORY_ORDER) {
+      const list = byCat.get(cat);
+      if (!list || list.length === 0) continue;
+      if (!first) items.push({ sep: true });
+      first = false;
+      // Add a non-clickable header by inserting a fake button styled separately
+      // via the label prefix. Menu.ts doesn't support headers, so we encode it
+      // visually with a leading "▸ " in caps.
+      items.push({
+        label: `── ${cat.toUpperCase()} ──`,
+        onClick: () => { /* no-op header */ },
+      });
+      for (const def of list) {
+        items.push({
+          label: `  ${def.label}`,
+          onClick: () => {
+            addScriptDescriptor(obj, {
+              type: def.type,
+              params: defaultParamsFor(def.params),
+            });
+            this.scene.notifyChanged();
+            this.show(obj);
+          },
         });
-        this.scene.notifyChanged();
-        this.show(obj);
-      },
-    }));
+      }
+    }
     openMenuPopup(anchor, items);
   }
 

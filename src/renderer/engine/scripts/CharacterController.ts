@@ -19,6 +19,7 @@ registerScript({
   type: 'CharacterController',
   label: 'Character Controller',
   description: 'FPS-style: WASD walk, Space jump, mouse look, click to lock pointer. Requires PhysicsSystem (auto, when you press Play).',
+  category: 'Player',
   params: [
     { key: 'speed', label: 'Move speed', kind: 'number', default: 5, step: 0.5 },
     { key: 'sprint', label: 'Sprint multiplier', kind: 'number', default: 1.6, step: 0.1 },

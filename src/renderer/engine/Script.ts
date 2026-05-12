@@ -36,10 +36,22 @@ export interface ScriptParamDef {
   step?: number;
 }
 
+export type ScriptCategory =
+  | 'Behavior'   // movement, rotation, lock-on, AI
+  | 'Paint'      // PaintShooter / PaintImpact / paintball-specific
+  | 'Camera'     // MainCamera / FollowCamera / orbit cameras
+  | 'Audio'      // listener / source
+  | 'Physics'    // Rigidbody
+  | 'Player'     // CharacterController / PlayerController / Shooter / Crosshair
+  | 'Animation'  // AnimationPlayer / AttachToBone
+  | 'FX'         // ParticleEmitter
+  | 'User';      // user-defined scripts
+
 export interface ScriptDefinition {
   type: string;
   label: string;
   description: string;
+  category?: ScriptCategory;
   params: ScriptParamDef[];
   create: (ctx: ScriptCtx, params: Record<string, unknown>) => Script;
 }

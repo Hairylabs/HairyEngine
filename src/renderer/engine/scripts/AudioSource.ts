@@ -22,6 +22,7 @@ registerScript({
   label: 'Audio Source',
   description:
     'Plays an audio file (URL or asset library path). 3D = falls off with distance from the Audio Listener; 2D = constant volume.',
+  category: 'Audio',
   params: [
     {
       key: 'url',

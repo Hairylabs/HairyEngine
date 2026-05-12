@@ -13,6 +13,7 @@ registerScript({
   type: 'ParticleEmitter',
   label: 'Particle Emitter',
   description: 'Continuously emits short-lived points. Tweak rate/spread/lifetime for the look.',
+  category: 'FX',
   params: [
     { key: 'rate', label: 'Per second', kind: 'number', default: 30, step: 1 },
     { key: 'lifetime', label: 'Lifetime (s)', kind: 'number', default: 1.2, step: 0.1 },

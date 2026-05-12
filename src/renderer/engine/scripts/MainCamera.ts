@@ -8,6 +8,7 @@ registerScript({
   type: 'MainCamera',
   label: 'Main Camera',
   description: 'Marks this camera as the active render camera during Play Mode.',
+  category: 'Camera',
   params: [],
   create: (ctx: ScriptCtx): Script => {
     return {
