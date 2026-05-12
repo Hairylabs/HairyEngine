@@ -40,6 +40,7 @@
     "appId": "com.hairylabs.hairyengine",
     "productName": "HairyEngine",
     "asar": true,
+    "npmRebuild": false,
     "directories": {
       "buildResources": "build",
       "output": "dist"
