@@ -80,11 +80,32 @@ export class DropZone {
         await this.importFbx(file);
       } else if (name.endsWith('.hairy') || name.endsWith('.json')) {
         await this.openProject(file);
+      } else if (/\.(png|jpg|jpeg|webp|bmp)$/.test(name)) {
+        // External image drop: save it into the asset library so the user
+        // can re-use it, then apply to selection if there is one.
+        await this.importToLibraryAndOptionallyApply(file, 'image');
+      } else if (/\.(mp3|wav|ogg|m4a)$/.test(name)) {
+        await this.importToLibraryAndOptionallyApply(file, 'audio');
       } else {
         this.onMessage(`Unsupported file: ${file.name}`);
       }
     }
   };
+
+  private async importToLibraryAndOptionallyApply(file: File, kind: 'image' | 'audio') {
+    const bytes = await file.arrayBuffer();
+    const r = await window.hairy.assets.writeBinary(file.name, bytes);
+    if (!r.ok) {
+      this.onMessage(`Library write failed: ${r.error}`);
+      return;
+    }
+    this.onMessage(`Saved ${file.name} to library`);
+    // If there's a selection, apply the dropped file to it immediately.
+    if (this.scene.selection) {
+      if (kind === 'image') await this.applyImageTexture(r.path);
+      else await this.attachAudioSource(r.path);
+    }
+  }
 
   private async importFbx(file: File) {
     try {
@@ -114,6 +135,23 @@ export class DropZone {
   }
 
   private async spawnLibraryAsset(path: string) {
+    // Internal asset paths can be:
+    //   "script:<id>"       — a user-defined script; attach to selection
+    //   "/path/to/file.glb" — a real file on disk; route by extension
+    if (path.startsWith('script:')) {
+      await this.attachUserScript(path.replace(/^script:/, ''));
+      return;
+    }
+    const lower = path.toLowerCase();
+    if (lower.endsWith('.png') || lower.endsWith('.jpg') || lower.endsWith('.jpeg') || lower.endsWith('.webp') || lower.endsWith('.bmp')) {
+      await this.applyImageTexture(path);
+      return;
+    }
+    if (lower.endsWith('.mp3') || lower.endsWith('.wav') || lower.endsWith('.ogg') || lower.endsWith('.m4a')) {
+      await this.attachAudioSource(path);
+      return;
+    }
+    // Default: try to parse as a GLB / glTF.
     const r = await window.hairy.assets.read(path);
     if (!r.ok) {
       this.onMessage(`Could not read asset: ${r.error}`);
@@ -140,6 +178,75 @@ export class DropZone {
     } catch (err) {
       this.onMessage(`Spawn failed: ${(err as Error).message}`);
     }
+  }
+
+  /** Drop an image onto the viewport → apply it as the diffuse texture of
+   *  whatever mesh sits under the cursor, or the currently selected mesh. */
+  private async applyImageTexture(path: string) {
+    const target = this.scene.selection as THREE.Mesh | null;
+    if (!target || !target.isMesh) {
+      this.onMessage('Select a mesh first, then drop the image to use it as a texture');
+      return;
+    }
+    const r = await window.hairy.assets.read(path);
+    if (!r.ok) {
+      this.onMessage(`Could not read image: ${r.error}`);
+      return;
+    }
+    const blob = new Blob([r.bytes]);
+    const url = URL.createObjectURL(blob);
+    const loader = new THREE.TextureLoader();
+    loader.load(url, (tex) => {
+      tex.colorSpace = THREE.SRGBColorSpace;
+      const mat = target.material as THREE.MeshStandardMaterial;
+      if (mat && 'map' in mat) {
+        mat.map = tex;
+        if (mat.color) mat.color.set('#ffffff');
+        mat.needsUpdate = true;
+        this.onMessage(`Applied texture to "${target.name}"`);
+      }
+      URL.revokeObjectURL(url);
+    }, undefined, (err) => {
+      this.onMessage(`Texture load failed: ${(err as ErrorEvent).message ?? err}`);
+      URL.revokeObjectURL(url);
+    });
+  }
+
+  /** Drop an audio asset → add an AudioSource script to the selected actor
+   *  (or to a new empty actor at the drop location if nothing's selected). */
+  private async attachAudioSource(path: string) {
+    const target = this.scene.selection;
+    if (!target) {
+      this.onMessage('Select an actor first, then drop the audio file to attach it');
+      return;
+    }
+    const scripts = (target.userData.__scripts as Array<{ type: string; params?: Record<string, unknown> }> | undefined) ?? [];
+    scripts.push({ type: 'AudioSource', params: { src: path } });
+    target.userData.__scripts = scripts;
+    this.scene.notifyChanged();
+    this.scene.select(target);
+    this.onMessage(`Attached AudioSource (${path.split(/[\\/]/).pop()}) to "${target.name}"`);
+  }
+
+  /** Drop a user-defined script onto an actor → attach it as a component. */
+  private async attachUserScript(scriptId: string) {
+    const target = this.scene.selection;
+    if (!target) {
+      this.onMessage('Select an actor first, then drop the script onto the viewport');
+      return;
+    }
+    const mod = await import('../engine/UserScripts');
+    const script = mod.getUserScript(scriptId);
+    if (!script) {
+      this.onMessage('Script no longer exists');
+      return;
+    }
+    const scripts = (target.userData.__scripts as Array<{ type: string; params?: Record<string, unknown> }> | undefined) ?? [];
+    scripts.push({ type: script.type, params: {} });
+    target.userData.__scripts = scripts;
+    this.scene.notifyChanged();
+    this.scene.select(target);
+    this.onMessage(`Attached "${script.name}" to "${target.name}"`);
   }
 
   private async importGltf(file: File) {

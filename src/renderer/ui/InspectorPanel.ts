@@ -295,7 +295,41 @@ export class InspectorPanel {
       addBtn.textContent = '+ Add Component';
       addBtn.addEventListener('click', (e) => this.openAddScriptMenu(obj, e.currentTarget as HTMLElement));
       body.appendChild(addBtn);
+
+      // Dedicated "+ Script from Assets" — opens a focused picker showing
+      // ONLY user-defined scripts saved in the asset library. Easier to
+      // discover than scrolling to the User section of the main menu.
+      const scriptBtn = document.createElement('button');
+      scriptBtn.className = 'inspector-add-btn';
+      scriptBtn.style.marginTop = '6px';
+      scriptBtn.textContent = '📝 + Script from Assets';
+      scriptBtn.addEventListener('click', (e) => this.openUserScriptPicker(obj, e.currentTarget as HTMLElement));
+      body.appendChild(scriptBtn);
     });
+  }
+
+  private async openUserScriptPicker(obj: THREE.Object3D, anchor: HTMLElement) {
+    const mod = await import('../engine/UserScripts');
+    const scripts = mod.listUserScripts();
+    if (scripts.length === 0) {
+      const items = [
+        {
+          label: 'No user scripts yet. Open Assets → 📝 New Script',
+          onClick: () => { /* */ },
+        },
+      ];
+      openMenuPopup(anchor, items);
+      return;
+    }
+    const items = scripts.map((s) => ({
+      label: `📝 ${s.name}${s.enabled ? '' : ' (disabled)'}`,
+      onClick: () => {
+        addScriptDescriptor(obj, { type: s.type, params: {} });
+        this.scene.notifyChanged();
+        this.show(obj);
+      },
+    }));
+    openMenuPopup(anchor, items);
   }
 
   private openAddScriptMenu(obj: THREE.Object3D, anchor: HTMLElement) {

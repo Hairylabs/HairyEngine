@@ -1353,77 +1353,9 @@ function isEditableTarget(target: EventTarget | null): boolean {
   return tag === 'INPUT' || tag === 'TEXTAREA' || target.isContentEditable;
 }
 
-// Resizable panels — drag the vertical handles between left/center/right.
-// Persists widths to localStorage so they survive across sessions.
-const PANEL_W_KEY = 'hairy.panelWidths.v1';
-const appBody = document.querySelector('.app-body') as HTMLElement;
-const handleLeft = document.getElementById('handle-left') as HTMLElement;
-const handleRight = document.getElementById('handle-right') as HTMLElement;
-
-(function restorePanelWidths() {
-  try {
-    const raw = localStorage.getItem(PANEL_W_KEY);
-    if (!raw) return;
-    const w = JSON.parse(raw) as { left?: number; right?: number };
-    if (typeof w.left === 'number') appBody.style.setProperty('--panel-left-w', `${w.left}px`);
-    if (typeof w.right === 'number') appBody.style.setProperty('--panel-right-w', `${w.right}px`);
-  } catch {
-    /* */
-  }
-})();
-
-function persistPanelWidths() {
-  const left = appBody.style.getPropertyValue('--panel-left-w') || '240px';
-  const right = appBody.style.getPropertyValue('--panel-right-w') || '320px';
-  try {
-    localStorage.setItem(PANEL_W_KEY, JSON.stringify({
-      left: parseInt(left), right: parseInt(right),
-    }));
-  } catch {
-    /* */
-  }
-}
-
-function wirePanelHandle(handle: HTMLElement, side: 'left' | 'right') {
-  let dragging = false;
-  let startX = 0;
-  let startW = 0;
-  handle.addEventListener('pointerdown', (e) => {
-    dragging = true;
-    startX = e.clientX;
-    const cur = side === 'left'
-      ? appBody.style.getPropertyValue('--panel-left-w') || '240px'
-      : appBody.style.getPropertyValue('--panel-right-w') || '320px';
-    startW = parseInt(cur);
-    handle.classList.add('dragging');
-    document.body.style.cursor = 'col-resize';
-    handle.setPointerCapture(e.pointerId);
-  });
-  handle.addEventListener('pointermove', (e) => {
-    if (!dragging) return;
-    const delta = e.clientX - startX;
-    // Right handle resizes the right panel by reducing width as you drag right.
-    const sign = side === 'left' ? 1 : -1;
-    const next = Math.max(160, Math.min(window.innerWidth * 0.5, startW + delta * sign));
-    if (side === 'left') {
-      appBody.style.setProperty('--panel-left-w', `${next}px`);
-    } else {
-      appBody.style.setProperty('--panel-right-w', `${next}px`);
-    }
-  });
-  const endDrag = (e: PointerEvent) => {
-    if (!dragging) return;
-    dragging = false;
-    handle.classList.remove('dragging');
-    document.body.style.cursor = '';
-    try { handle.releasePointerCapture(e.pointerId); } catch { /* */ }
-    persistPanelWidths();
-  };
-  handle.addEventListener('pointerup', endDrag);
-  handle.addEventListener('pointercancel', endDrag);
-}
-wirePanelHandle(handleLeft, 'left');
-wirePanelHandle(handleRight, 'right');
+// (Resizable panels removed for now — the grid-handle approach broke the
+// layout. Plan: re-add as absolute-positioned overlays on the panel borders
+// so the existing grid template stays untouched.)
 
 // Menus — `+ Add` header button + the new `+` button inside the Scene panel
 // header both open the same actor menu.
