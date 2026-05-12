@@ -1,6 +1,16 @@
 import * as THREE from 'three';
 import { Scene } from './Scene';
 import { History } from './History';
+
+// TODO (multi-select face mode): real Blender-style "click + shift-click to
+// add another face, then E to extrude both" requires a full mesh-edit mode
+// with a selection state distinct from drag state. The current widget
+// conflates "click face" with "start drag" so multi-select would need
+// either a) mode toggle (Tab in Blender → select, then E → extrude), or
+// b) modifier-key disambiguation (shift-click extends, normal-click starts
+// drag with current selection). For arbitrary GLBs we'd also want a real
+// half-edge data structure — vendoring three-edit or porting mda is on the
+// roadmap. Today: single coplanar cluster only.
 import {
   canonicalizeForFaceOps,
   extrudeCluster,
